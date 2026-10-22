@@ -21,7 +21,7 @@ s=open(os.path.join(ROOT,'model','template.html')).read().replace('__DATA__',jso
 HEAD='''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Simulador bayesiano de escaños del Congreso para las generales del 29 de noviembre de 2026: media de encuestas, sensibilidad por partido y voto útil por provincia.">
-<meta property="og:title" content="Simulador del Congreso"><meta property="og:description" content="Mueve los votos y mira dónde rinde el voto a cada partido, provincia a provincia.">
+<meta property="og:title" content="Voto útil a la derecha"><meta property="og:description" content="Mueve los votos y mira dónde rinde el voto a cada partido, provincia a provincia.">
 <meta property="og:type" content="website"><meta property="og:image" content="__SITE__docs/portada.png"><meta property="og:url" content="__SITE__">
 <meta name="twitter:card" content="summary_large_image"><style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
 '''

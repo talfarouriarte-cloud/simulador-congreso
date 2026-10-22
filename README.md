@@ -1,4 +1,4 @@
-# Simulador del Congreso · Generales 29-N 2026
+# Voto útil a la derecha · Generales 29-N 2026
 
 Simulador de escaños del Congreso de los Diputados para las elecciones generales del 29 de noviembre de 2026. Parte de una media bayesiana de encuestas y permite mover los supuestos para ver cómo cambia el reparto, nacional y por provincia, y dónde rinde más el voto a Vox o al PP para el bloque PP+Vox.
 
