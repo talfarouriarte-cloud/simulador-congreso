@@ -378,7 +378,7 @@ function renderErr(){const W=320,Hh=170,ml=24,mr=6,mt=14,mb=30;const xmax=95,yma
   s+=`<line x1="${x(POLL_DAYS)}" y1="${mt}" x2="${x(POLL_DAYS)}" y2="${Hh-mb}" stroke="var(--accent)" stroke-width="1.5"/><text x="${x(POLL_DAYS)+4}" y="${mt+4}" style="font:600 10px var(--f-mono);fill:var(--accent)">hoy (${POLL_DAYS} d)</text>`;
   s+=`<line x1="${ml}" y1="${Hh-mb}" x2="${W-mr}" y2="${Hh-mb}" stroke="var(--muted)"/>`;$('errcurve').innerHTML=s;
   $('err-read').textContent=`Con ${fmt(u)} pts, el voto de PP+Vox caería en el 90% de los casos a unos ±${fmt(1.645*u)} pts de tus supuestos.`}
-function renderBars(){const rows=P.map((p,j)=>({p,j,med:q(R.natSeats[j],.5),lo:q(R.natSeats[j],.05),hi:q(R.natSeats[j],.95),c:C.seats.reduce((a,s)=>a+s[j],0)})).filter(r=>r.hi>0||r.c>0).sort((a,b)=>b.med-a.med||b.hi-a.hi);
+function renderBars(){const rows=P.map((p,j)=>({p,j,med:q(R.natSeats[j],.5),lo:q(R.natSeats[j],.05),hi:q(R.natSeats[j],.95),c:C.seats.reduce((a,s)=>a+s[j],0)})).filter(r=>r.p!=='Otros').sort((a,b)=>b.med-a.med||b.hi-a.hi||pollMean[b.p]-pollMean[a.p]);
   const mx=Math.max(...rows.map(r=>r.hi),10);
   $('bars').innerHTML=rows.map(r=>`<div class="bar"><span><span class="sw" style="background:${COL[r.p]};display:inline-block;margin-right:5px"></span>${SHORT[r.p]||r.p}</span><div class="t"><i style="left:${r.lo/mx*100}%;width:${Math.max((r.hi-r.lo)/mx*100,.6)}%;background:${COL[r.p]}"></i><em style="left:calc(${r.med/mx*100}% - 1.5px);background:${COL[r.p]}"></em></div><span class="v">${r.med} <span class="muted">${r.lo}–${r.hi}</span></span></div>`).join('')}
 function renderHemi(){const tot=P.map((p,j)=>C.seats.reduce((a,s)=>a+s[j],0));const seq=[];for(const p of ORDER){const j=P.indexOf(p);for(let i=0;i<tot[j];i++)seq.push(p)}
