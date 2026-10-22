@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Simulador bayesiano de escaños del Congreso para las generales del 29 de noviembre de 2026: media de encuestas, sensibilidad por partido y voto útil por provincia.">
+<meta property="og:title" content="Simulador del Congreso"><meta property="og:description" content="Mueve los votos y mira dónde rinde el voto a cada partido, provincia a provincia.">
+<meta property="og:type" content="website"><meta property="og:image" content="https://talfarouriarte-cloud.github.io/simulador-congreso/docs/portada.png"><meta property="og:url" content="https://talfarouriarte-cloud.github.io/simulador-congreso/">
+<meta name="twitter:card" content="summary_large_image"><style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>Simulador del Congreso</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: panel de supuestos fijo a la izquierda, resultados a la derecha; en móvil se apilan. */
+:root{
+  --bg:#f1f3ef; --surface:#ffffff; --surface-2:#e7ebe5; --ink:#17201c; --muted:#5b6660; --line:#d5dbd3;
+  --accent:#0e5a6b; --accent-ink:#ffffff; --good:#2d7d46; --warn:#a86a00;
+  --pp:#1f77c9; --vox:#4f9a2a; --neutral-tile:#e2e6e0;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif; --f-body:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111614; --surface:#181f1c; --surface-2:#222a27; --ink:#e6ebe8; --muted:#97a39d; --line:#2e3833;
+  --accent:#5db4c6; --accent-ink:#0b1416; --good:#5cbf7a; --warn:#e0a53c; --pp:#4a9be6; --vox:#7cc451; --neutral-tile:#2a332f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111614; --surface:#181f1c; --surface-2:#222a27; --ink:#e6ebe8; --muted:#97a39d; --line:#2e3833;
+  --accent:#5db4c6; --accent-ink:#0b1416; --good:#5cbf7a; --warn:#e0a53c; --pp:#4a9be6; --vox:#7cc451; --neutral-tile:#2a332f; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1320px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:12px}
+h1{font-family:var(--f-display);font-stretch:80%;font-weight:800;font-size:clamp(28px,4vw,44px);line-height:1;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-family:var(--f-display);font-stretch:85%;font-weight:700;font-size:20px;margin:0;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:700;font-size:15px;margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;min-width:0}
+aside.panel{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px);overflow:auto}
+@media (max-width:900px){aside.panel{position:static;max-height:none;order:2}main{order:1}}
+.stack{display:flex;flex-direction:column;gap:14px}
+.sl{display:grid;grid-template-columns:78px minmax(0,1fr) 58px;gap:8px;align-items:center}
+.sl label{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.sw{width:10px;height:10px;border-radius:2px;flex:none}
+.sl output{font-family:var(--f-mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+.track{position:relative}
+.track input{width:100%;accent-color:var(--accent);margin:0}
+.track .pm{position:absolute;top:-3px;height:6px;border-radius:3px;background:var(--accent);opacity:.28;pointer-events:none}
+.sl small{grid-column:2/4;font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:-6px}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:4px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+select{font:inherit;font-size:13px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 6px}
+.sep{border:0;border-top:1px solid var(--line);margin:4px 0}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{display:flex;flex-direction:column;gap:2px;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.kpi b{font-family:var(--f-display);font-stretch:80%;font-size:32px;line-height:1.05;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12.5px;color:var(--muted)}
+.row2{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px}
+@media (max-width:1100px){.row2{grid-template-columns:minmax(0,1fr)}}
+svg text{fill:var(--ink)}
+.bars{display:flex;flex-direction:column;gap:5px}
+.bar{display:grid;grid-template-columns:86px minmax(0,1fr) 92px;gap:8px;align-items:center;font-size:13px}
+.bar .t{position:relative;height:16px;background:var(--surface-2);border-radius:3px}
+.bar .t i{position:absolute;top:0;bottom:0;border-radius:3px;opacity:.35}
+.bar .t em{position:absolute;top:-2px;bottom:-2px;width:3px;border-radius:2px}
+.bar .v{font-family:var(--f-mono);font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);align-items:center}
+.ramp{width:160px;height:10px;border-radius:2px}
+.map{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
+.tile{aspect-ratio:1/1;max-width:100%;border-radius:4px;border:1px solid var(--line);padding:3px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;min-width:0;overflow:hidden;background:var(--neutral-tile);color:var(--ink)}
+.tile .n{font-size:clamp(8px,1vw,11px);font-weight:700;line-height:1.05;overflow-wrap:anywhere;hyphens:auto}
+.tile .a{display:none;font-size:11px;font-weight:700}
+@media (max-width:640px){.tile .n{display:none}.tile .a{display:block}.map{gap:3px}.tile{padding:2px}}
+.tile .m{font-family:var(--f-mono);font-size:clamp(8px,.95vw,11px)}
+.tile.sel{outline:2px solid var(--ink);outline-offset:1px}
+.tile.empty{visibility:hidden}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+#tbl th,#tbl td,#bloc-tbl th,#bloc-tbl td{white-space:nowrap}
+.detail table td:first-child{white-space:normal;overflow-wrap:anywhere}
+.detail table td.num,.detail table th{white-space:nowrap}
+#tbl td:first-child,#tbl th:first-child{position:sticky;left:0;z-index:1;background:var(--surface)}
+#tbl th:first-child{z-index:2}
+tr.clk:hover td:first-child{background:var(--surface-2)}
+th{font-weight:600;color:var(--muted);font-size:12px;cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
+th:first-child,td:first-child{text-align:left}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+tr.clk{cursor:pointer} tr.clk:hover td{background:var(--surface-2)}
+.chip{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11.5px;font-weight:600;border:1px solid currentColor}
+.c-vox{color:var(--vox)} .c-pp{color:var(--pp)} .c-neu{color:var(--muted)}
+.detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:700px){.detail{grid-template-columns:minmax(0,1fr)}}
+.prose{max-width:72ch;font-size:14.5px}
+#method>h2:first-child{display:none}
+.prose p{margin:.5em 0}
+.prose li{margin:.25em 0}
+.status{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.hint{font-size:12.5px;color:var(--muted)}
+.sect{padding:0}
+.sect>summary{position:relative;list-style:none;display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;border-radius:6px}
+.sect>summary::-webkit-details-marker{display:none}
+.sect>summary:hover{background:var(--surface-2)}
+.sect>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.sect>summary h2{flex:0 1 auto}
+.sect>div{padding:0 16px 16px}
+.chev{margin-left:auto;width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
+.sect:not([open])>summary .chev{transform:rotate(-45deg)}
+.info{position:static;flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--muted);color:var(--muted);font:700 11px/15px var(--f-mono);text-align:center;cursor:help}
+.info:hover,.info:focus{border-color:var(--accent);color:var(--accent);outline:none}
+.info .tip{display:none;position:absolute;left:16px;right:16px;top:calc(100% - 4px);z-index:20;max-width:460px;padding:10px 12px;border-radius:6px;background:var(--ink);color:var(--bg);font:400 13px/1.45 var(--f-body);text-align:left;box-shadow:0 6px 20px rgb(0 0 0 / .18)}
+.info:hover .tip,.info:focus .tip,.info:focus-within .tip{display:block}
+.row2>.sect{align-self:start}
+.info.inline .tip{left:0;right:0;top:24px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="stack" style="gap:6px">
+      <span class="eyebrow">Generales del 29 de noviembre de 2026 · 350 escaños · 52 circunscripciones · D'Hondt con umbral del 3%</span>
+      <h1>Simulador del Congreso</h1>
+    </div>
+    <div class="status" id="status">Calculando…</div>
+  </header>
+
+  <div class="grid">
+    <aside class="panel stack" aria-label="Supuestos">
+      <div class="stack" style="gap:4px">
+        <h2>Lo que crees que va a pasar</h2>
+        <p class="hint" style="margin:0">Voto nacional en % de voto válido. La franja sombreada es la media de encuestas ± 2 desviaciones. «Otros y blanco» se calcula como resto.</p>
+      </div>
+      <div class="btns">
+        <button id="b-reset" class="primary">Media de encuestas</button>
+        <button data-move="Vox,PP,1">Vox → PP 1 pt</button>
+        <button data-move="PP,Vox,1">PP → Vox 1 pt</button>
+        <button data-move="PSOE,PP,1">PSOE → PP 1 pt</button>
+        <button data-move="PP,PSOE,1">PP → PSOE 1 pt</button>
+      </div>
+      <div id="sliders" class="stack" style="gap:12px"></div>
+      <div class="sl"><label>Otros</label><div class="hint">Otros y blanco</div><output id="o-otros" class="mono">–</output></div>
+      <hr class="sep">
+      <div class="stack" style="gap:10px">
+        <h3>Incertidumbre y medida del voto útil</h3>
+        <div class="sl"><label for="unc">Error</label><div class="track"><input id="unc" type="range" min="0" max="6" step="0.1" value="2.9"></div><output id="o-unc">2,9 pts</output>
+          <small>Error típico de las encuestas en el voto del bloque PP+Vox, en puntos. Por defecto, el histórico a 43 días de la elección.</small></div>
+        <div class="stack" style="gap:6px">
+          <div style="display:flex;align-items:center;gap:8px;position:relative"><span class="eyebrow">Error histórico según días hasta votar</span><span class="info inline" tabindex="0" role="button" aria-label="Qué muestra este gráfico">i<span class="tip" role="tooltip">Cuánto se equivocó la media de encuestas en el voto de cada bloque según los días que faltaban para votar, en las generales de 2016, abril 2019, noviembre 2019 y 2023. Es la desviación típica del error, en puntos. Azul: bloque derecha. Rojo: bloque izquierda. La línea discontinua es el error que usas y la vertical, la fecha de las encuestas actuales. El error baja hasta unas dos semanas antes de votar y luego se estanca en unos 2 pts: ese suelo es sesgo de las encuestas, no falta de datos. Con solo cuatro elecciones, la curva es orientativa.</span></span></div>
+          <svg id="errcurve" viewBox="0 0 320 170" role="img" aria-label="Error de las encuestas según los días hasta la elección" style="width:100%;height:auto"></svg>
+          <p class="hint" style="margin:0" id="err-read"></p>
+          <div class="btns"><button id="b-err43">A 43 días: 2,9 pts</button><button id="b-err14">Final de campaña: 2,2 pts</button></div>
+        </div>
+        <div class="sl"><label for="delta">Trasvase</label><div class="track"><input id="delta" type="range" min="0.25" max="5" step="0.25" value="1"></div><output id="o-delta">1,0</output>
+          <small>Puntos del voto de cada provincia que se mueven entre Vox y PP para medir el voto útil.</small></div>
+        <div class="sl"><label for="nsim">Simul.</label><div class="track"><input id="nsim" type="range" min="500" max="6000" step="500" value="2000"></div><output id="o-nsim">2000</output></div>
+      </div>
+    </aside>
+
+    <main class="stack" style="gap:20px;min-width:0">
+      <details class="panel sect" open>
+        <summary><h2>Hemiciclo del escenario central</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Reparto exacto con los porcentajes que has elegido, sin ruido ni incertidumbre. La línea discontinua marca la mayoría absoluta (176) y el número central suma los escaños de PP y Vox.</span></span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="stack">
+          <svg id="hemi" viewBox="0 0 520 290" role="img" aria-label="Hemiciclo" style="width:100%;max-width:720px;height:auto;margin:0 auto;display:block"></svg>
+          <div class="legend" id="hemi-leg"></div>
+        </div>
+      </details>
+      <section class="kpis" id="kpis"></section>
+
+      <details class="panel sect">
+        <summary><h2>Escaños por partido</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Resultado de todas las simulaciones. La marca es la mediana de escaños y la barra clara, el intervalo donde caen el 90% de los casos. Una barra ancha indica que el partido está cerca de ganar o perder escaños en varias provincias.</span></span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="stack">
+          <div class="bars" id="bars"></div>
+        </div>
+      </details>
+
+      <details class="panel sect">
+        <summary><h2>Escaños por bloques</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Cómo se reparte la incertidumbre entre bloques. Cada curva es la distribución de escaños del bloque en las simulaciones, escalada a su propio máximo para comparar la forma. Derecha: PP (con UPN), Vox y SALF. Izquierda: PSOE, Frente Amplio, Compromís-FV y Podemos. Otros: ERC, Junts, Bildu, PNV, BNG, CC, Adelante y Existe.</span></span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="stack">
+          <svg id="blocs" viewBox="0 0 640 230" role="img" aria-label="Distribución de escaños por bloque" style="width:100%;height:auto"></svg>
+          <div class="tablewrap"><table id="bloc-tbl"></table></div>
+        </div>
+      </details>
+
+      <details class="panel sect">
+        <summary><h2>¿Dónde rinde el voto a Vox?</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip" id="map-tip"></span></span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="stack">
+          <div class="btns" role="tablist" aria-label="Métrica del mapa">
+            <button data-metric="net" class="primary">Ventaja de votar Vox</button>
+            <button data-metric="conc">Prob. de que concentrar en PP sume</button>
+            <button data-metric="vox">Prob. de que pasar voto a Vox sume</button>
+            <button data-metric="waste">Voto a Vox sin escaño</button>
+          </div>
+          <p class="hint" style="margin:0" id="map-hint"></p>
+          <div class="legend" id="map-leg"></div>
+          <div class="map" id="map"></div>
+        </div>
+      </details>
+
+      <details class="panel sect" id="detail-sect">
+        <summary><h2>Detalle de provincia</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Pulsa una provincia en el mapa o en la tabla. Muestra el reparto del escenario central, los escaños medios de las simulaciones, el último cociente D'Hondt que entra y los siguientes que se quedan fuera, y cuántos votos habría que mover entre PP y Vox para cambiar un escaño del bloque.</span></span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="stack">
+          <div class="stack" id="detail"></div>
+        </div>
+      </details>
+
+      <details class="panel sect">
+        <summary><h2>Todas las provincias</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Pulsa una cabecera para ordenar y una fila para ver el detalle. «Votos Vox→PP» y «Votos PP→Vox» son los votos que hay que mover en el escenario central para que PP+Vox ganen (+1) o pierdan (−1) un escaño.</span></span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="stack">
+          <div class="tablewrap"><table id="tbl"></table></div>
+        </div>
+      </details>
+
+      <details class="panel sect">
+        <summary><h2>Cómo está hecho</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Datos, supuestos y limitaciones del modelo: base de 2023, agregación de encuestas, calibración del error, candidaturas del 29-N y cálculo del voto útil.</span></span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="stack">
+          <div class="prose" id="method"></div>
+        </div>
+      </details>
+    </main>
+  </div>
+</div>
+
+<script id="data" type="application/json">{"means": {"PP": {"mean": 32.0, "sd": 0.401}, "PSOE": {"mean": 26.57, "sd": 0.285}, "Vox": {"mean": 18.76, "sd": 0.252}, "Podemos": {"mean": 2.01, "sd": 0.154}, "SALF": {"mean": 1.65, "sd": 0.102}, "ERC": {"mean": 2.8, "sd": 0.116}, "Junts": {"mean": 1.5, "sd": 0.143}, "EH Bildu": {"mean": 1.35, "sd": 0.096}, "PNV": {"mean": 0.94, "sd": 0.08}, "BNG": {"mean": 0.9, "sd": 0.081}, "CC": {"mean": 0.42, "sd": 0.057}, "AA": {"mean": 0.93, "sd": 0.092}, "FV": {"mean": 1.67, "sd": 0.114}, "FA": {"mean": 5.36, "sd": 0.284}, "Existe": {"mean": 0.08, "sd": 0.03}}, "parties": ["PP", "PSOE", "Vox", "FA", "FV", "Podemos", "SALF", "ERC", "Junts", "EH Bildu", "PNV", "BNG", "CC", "AA", "Existe", "Otros"], "provinces": [{"prov": "A Coruña", "ccaa": "Galicia", "seats": 8, "seats2023": 8, "valid": 677702, "PP": 0.424594, "PSOE": 0.277323, "Vox": 0.049989, "FA": 0.061753, "FV": 0.0, "Podemos": 0.05827, "SALF": 0.019945, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.098282, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009845}, {"prov": "Albacete", "ccaa": "Castilla-La Mancha", "seats": 4, "seats2023": 4, "valid": 221191, "PP": 0.383292, "PSOE": 0.331302, "Vox": 0.159526, "FA": 0.039808, "FV": 0.0, "Podemos": 0.028925, "SALF": 0.047546, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009602}, {"prov": "Alicante", "ccaa": "C. Valenciana", "seats": 12, "seats2023": 12, "valid": 899192, "PP": 0.35106, "PSOE": 0.305829, "Vox": 0.155321, "FA": 0.0, "FV": 0.123067, "Podemos": 0.0, "SALF": 0.055165, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009557}, {"prov": "Almería", "ccaa": "Andalucía", "seats": 6, "seats2023": 6, "valid": 321242, "PP": 0.375081, "PSOE": 0.266022, "Vox": 0.194961, "FA": 0.039483, "FV": 0.0, "Podemos": 0.021788, "SALF": 0.05686, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.036645, "Existe": 0.0, "Otros": 0.009161}, {"prov": "Asturias", "ccaa": "Asturias", "seats": 7, "seats2023": 7, "valid": 597032, "PP": 0.350819, "PSOE": 0.338015, "Vox": 0.122927, "FA": 0.089053, "FV": 0.0, "Podemos": 0.05705, "SALF": 0.032294, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009842}, {"prov": "Badajoz", "ccaa": "Extremadura", "seats": 5, "seats2023": 5, "valid": 391461, "PP": 0.370888, "PSOE": 0.384427, "Vox": 0.133989, "FA": 0.035383, "FV": 0.0, "Podemos": 0.031692, "SALF": 0.033815, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009806}, {"prov": "Baleares", "ccaa": "Baleares", "seats": 8, "seats2023": 8, "valid": 503280, "PP": 0.342791, "PSOE": 0.290184, "Vox": 0.146342, "FA": 0.092708, "FV": 0.0, "Podemos": 0.066902, "SALF": 0.051451, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009622}, {"prov": "Barcelona", "ccaa": "Cataluña", "seats": 32, "seats2023": 32, "valid": 2667478, "PP": 0.137778, "PSOE": 0.357022, "Vox": 0.075643, "FA": 0.073485, "FV": 0.0, "Podemos": 0.0, "SALF": 0.028053, "ERC": 0.20194, "Junts": 0.09678, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.0293}, {"prov": "Bizkaia", "ccaa": "País Vasco", "seats": 8, "seats2023": 8, "valid": 609693, "PP": 0.114255, "PSOE": 0.255047, "Vox": 0.02603, "FA": 0.054621, "FV": 0.0, "Podemos": 0.05325, "SALF": 0.017064, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.20389, "PNV": 0.265965, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009876}, {"prov": "Burgos", "ccaa": "Castilla y León", "seats": 4, "seats2023": 4, "valid": 202569, "PP": 0.400327, "PSOE": 0.339283, "Vox": 0.125735, "FA": 0.04695, "FV": 0.0, "Podemos": 0.038183, "SALF": 0.039673, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.00985}, {"prov": "Cantabria", "ccaa": "Cantabria", "seats": 5, "seats2023": 5, "valid": 350150, "PP": 0.402221, "PSOE": 0.318324, "Vox": 0.13444, "FA": 0.04353, "FV": 0.0, "Podemos": 0.03759, "SALF": 0.054335, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.00956}, {"prov": "Castellón", "ccaa": "C. Valenciana", "seats": 5, "seats2023": 5, "valid": 307930, "PP": 0.335524, "PSOE": 0.311446, "Vox": 0.151534, "FA": 0.0, "FV": 0.136893, "Podemos": 0.0, "SALF": 0.055064, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.00954}, {"prov": "Ceuta", "ccaa": "Ceuta", "seats": 1, "seats2023": 1, "valid": 33321, "PP": 0.361262, "PSOE": 0.316908, "Vox": 0.216791, "FA": 0.010061, "FV": 0.0, "Podemos": 0.012899, "SALF": 0.072761, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009318}, {"prov": "Ciudad Real", "ccaa": "Castilla-La Mancha", "seats": 5, "seats2023": 5, "valid": 282979, "PP": 0.388706, "PSOE": 0.339208, "Vox": 0.156033, "FA": 0.034159, "FV": 0.0, "Podemos": 0.02482, "SALF": 0.047485, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009589}, {"prov": "Cuenca", "ccaa": "Castilla-La Mancha", "seats": 3, "seats2023": 3, "valid": 113808, "PP": 0.381635, "PSOE": 0.358639, "Vox": 0.149264, "FA": 0.030892, "FV": 0.0, "Podemos": 0.022446, "SALF": 0.047526, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009597}, {"prov": "Cáceres", "ccaa": "Extremadura", "seats": 4, "seats2023": 4, "valid": 275851, "PP": 0.324933, "PSOE": 0.332397, "Vox": 0.11628, "FA": 0.031274, "FV": 0.0, "Podemos": 0.028012, "SALF": 0.034486, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.132619}, {"prov": "Cádiz", "ccaa": "Andalucía", "seats": 8, "seats2023": 9, "valid": 637098, "PP": 0.324538, "PSOE": 0.309163, "Vox": 0.141583, "FA": 0.077459, "FV": 0.0, "Podemos": 0.042744, "SALF": 0.057883, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.037304, "Existe": 0.0, "Otros": 0.009326}, {"prov": "Córdoba", "ccaa": "Andalucía", "seats": 6, "seats2023": 6, "valid": 448602, "PP": 0.347991, "PSOE": 0.294974, "Vox": 0.128009, "FA": 0.08126, "FV": 0.0, "Podemos": 0.044842, "SALF": 0.057003, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.036737, "Existe": 0.0, "Otros": 0.009184}, {"prov": "Gipuzkoa", "ccaa": "País Vasco", "seats": 6, "seats2023": 6, "valid": 376621, "PP": 0.08588, "PSOE": 0.230202, "Vox": 0.020674, "FA": 0.053267, "FV": 0.0, "Podemos": 0.05193, "SALF": 0.017079, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.307922, "PNV": 0.22316, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009885}, {"prov": "Girona", "ccaa": "Cataluña", "seats": 6, "seats2023": 6, "valid": 322988, "PP": 0.097035, "PSOE": 0.289323, "Vox": 0.0703, "FA": 0.052834, "FV": 0.0, "Podemos": 0.0, "SALF": 0.028053, "ERC": 0.203755, "Junts": 0.195831, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.06287}, {"prov": "Granada", "ccaa": "Andalucía", "seats": 7, "seats2023": 7, "valid": 502845, "PP": 0.339497, "PSOE": 0.302747, "Vox": 0.147995, "FA": 0.068888, "FV": 0.0, "Podemos": 0.038014, "SALF": 0.056967, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.036714, "Existe": 0.0, "Otros": 0.009178}, {"prov": "Guadalajara", "ccaa": "Castilla-La Mancha", "seats": 3, "seats2023": 3, "valid": 140913, "PP": 0.350425, "PSOE": 0.318144, "Vox": 0.185675, "FA": 0.051168, "FV": 0.0, "Podemos": 0.037179, "SALF": 0.047763, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009645}, {"prov": "Huelva", "ccaa": "Andalucía", "seats": 5, "seats2023": 5, "valid": 256804, "PP": 0.335366, "PSOE": 0.330925, "Vox": 0.13467, "FA": 0.06179, "FV": 0.0, "Podemos": 0.034097, "SALF": 0.05713, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.036819, "Existe": 0.0, "Otros": 0.009205}, {"prov": "Huesca", "ccaa": "Aragón", "seats": 3, "seats2023": 3, "valid": 119895, "PP": 0.370332, "PSOE": 0.326038, "Vox": 0.122587, "FA": 0.069674, "FV": 0.0, "Podemos": 0.041742, "SALF": 0.049317, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.010613, "Otros": 0.009698}, {"prov": "Jaén", "ccaa": "Andalucía", "seats": 5, "seats2023": 5, "valid": 368731, "PP": 0.346975, "PSOE": 0.337399, "Vox": 0.137159, "FA": 0.047866, "FV": 0.0, "Podemos": 0.026414, "SALF": 0.057702, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.037187, "Existe": 0.0, "Otros": 0.009297}, {"prov": "La Rioja", "ccaa": "La Rioja", "seats": 4, "seats2023": 4, "valid": 174663, "PP": 0.446059, "PSOE": 0.348733, "Vox": 0.09544, "FA": 0.037281, "FV": 0.0, "Podemos": 0.026901, "SALF": 0.035812, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009774}, {"prov": "Las Palmas", "ccaa": "Canarias", "seats": 8, "seats2023": 8, "valid": 529337, "PP": 0.244831, "PSOE": 0.314268, "Vox": 0.138363, "FA": 0.173169, "FV": 0.0, "Podemos": 0.0, "SALF": 0.059865, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.060034, "AA": 0.0, "Existe": 0.0, "Otros": 0.00947}, {"prov": "León", "ccaa": "Castilla y León", "seats": 4, "seats2023": 4, "valid": 275240, "PP": 0.369151, "PSOE": 0.336354, "Vox": 0.1288, "FA": 0.037222, "FV": 0.0, "Podemos": 0.030272, "SALF": 0.040277, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.057925}, {"prov": "Lleida", "ccaa": "Cataluña", "seats": 4, "seats2023": 4, "valid": 184539, "PP": 0.128423, "PSOE": 0.294865, "Vox": 0.068061, "FA": 0.038097, "FV": 0.0, "Podemos": 0.0, "SALF": 0.028053, "ERC": 0.226845, "Junts": 0.180059, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.035597}, {"prov": "Lugo", "ccaa": "Galicia", "seats": 4, "seats2023": 4, "valid": 198566, "PP": 0.493742, "PSOE": 0.297737, "Vox": 0.042773, "FA": 0.026193, "FV": 0.0, "Podemos": 0.024716, "SALF": 0.019907, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.085105, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009827}, {"prov": "Madrid", "ccaa": "Madrid", "seats": 38, "seats2023": 37, "valid": 3608673, "PP": 0.390155, "PSOE": 0.267874, "Vox": 0.134968, "FA": 0.084004, "FV": 0.0, "Podemos": 0.064726, "SALF": 0.04865, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009622}, {"prov": "Melilla", "ccaa": "Melilla", "seats": 1, "seats2023": 1, "valid": 27349, "PP": 0.489806, "PSOE": 0.252917, "Vox": 0.158788, "FA": 0.015423, "FV": 0.0, "Podemos": 0.014702, "SALF": 0.058401, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009963}, {"prov": "Murcia", "ccaa": "Murcia", "seats": 10, "seats2023": 10, "valid": 747797, "PP": 0.39058, "PSOE": 0.239962, "Vox": 0.206879, "FA": 0.05272, "FV": 0.0, "Podemos": 0.038057, "SALF": 0.062318, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009484}, {"prov": "Málaga", "ccaa": "Andalucía", "seats": 11, "seats2023": 11, "valid": 788338, "PP": 0.352833, "PSOE": 0.27943, "Vox": 0.151599, "FA": 0.072766, "FV": 0.0, "Podemos": 0.040155, "SALF": 0.057165, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.036841, "Existe": 0.0, "Otros": 0.00921}, {"prov": "Navarra", "ccaa": "Navarra", "seats": 5, "seats2023": 5, "valid": 341844, "PP": 0.319801, "PSOE": 0.273672, "Vox": 0.057017, "FA": 0.069794, "FV": 0.0, "Podemos": 0.058692, "SALF": 0.030612, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.172459, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.017954}, {"prov": "Ourense", "ccaa": "Galicia", "seats": 4, "seats2023": 4, "valid": 186271, "PP": 0.49193, "PSOE": 0.295822, "Vox": 0.047935, "FA": 0.027627, "FV": 0.0, "Podemos": 0.026068, "SALF": 0.019921, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.080862, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009834}, {"prov": "Palencia", "ccaa": "Castilla y León", "seats": 3, "seats2023": 3, "valid": 96962, "PP": 0.417195, "PSOE": 0.344473, "Vox": 0.128144, "FA": 0.033215, "FV": 0.0, "Podemos": 0.027013, "SALF": 0.040023, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009937}, {"prov": "Pontevedra", "ccaa": "Galicia", "seats": 7, "seats2023": 7, "valid": 573124, "PP": 0.391354, "PSOE": 0.308976, "Vox": 0.047341, "FA": 0.066879, "FV": 0.0, "Podemos": 0.063107, "SALF": 0.019959, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.092533, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009852}, {"prov": "S.C. Tenerife", "ccaa": "Canarias", "seats": 7, "seats2023": 7, "valid": 494373, "PP": 0.338597, "PSOE": 0.320812, "Vox": 0.0, "FA": 0.110038, "FV": 0.0, "Podemos": 0.0, "SALF": 0.06055, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.160425, "AA": 0.0, "Existe": 0.0, "Otros": 0.009578}, {"prov": "Salamanca", "ccaa": "Castilla y León", "seats": 4, "seats2023": 4, "valid": 199110, "PP": 0.456855, "PSOE": 0.297256, "Vox": 0.142969, "FA": 0.029731, "FV": 0.0, "Podemos": 0.02418, "SALF": 0.039261, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009748}, {"prov": "Segovia", "ccaa": "Castilla y León", "seats": 3, "seats2023": 3, "valid": 88613, "PP": 0.43787, "PSOE": 0.297588, "Vox": 0.137308, "FA": 0.0432, "FV": 0.0, "Podemos": 0.035134, "SALF": 0.039173, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009726}, {"prov": "Sevilla", "ccaa": "Andalucía", "seats": 12, "seats2023": 12, "valid": 1059358, "PP": 0.30754, "PSOE": 0.33719, "Vox": 0.122687, "FA": 0.083351, "FV": 0.0, "Podemos": 0.045996, "SALF": 0.057175, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.036848, "Existe": 0.0, "Otros": 0.009212}, {"prov": "Soria", "ccaa": "Castilla y León", "seats": 2, "seats2023": 2, "valid": 50769, "PP": 0.372176, "PSOE": 0.294786, "Vox": 0.098052, "FA": 0.018586, "FV": 0.0, "Podemos": 0.015116, "SALF": 0.040277, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.161007}, {"prov": "Tarragona", "ccaa": "Cataluña", "seats": 6, "seats2023": 6, "valid": 368024, "PP": 0.138744, "PSOE": 0.329125, "Vox": 0.10336, "FA": 0.054732, "FV": 0.0, "Podemos": 0.0, "SALF": 0.028053, "ERC": 0.209327, "Junts": 0.110838, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.025821}, {"prov": "Teruel", "ccaa": "Aragón", "seats": 3, "seats2023": 3, "valid": 75913, "PP": 0.348636, "PSOE": 0.291461, "Vox": 0.130243, "FA": 0.0, "FV": 0.0, "Podemos": 0.020271, "SALF": 0.050622, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.148812, "Otros": 0.009955}, {"prov": "Toledo", "ccaa": "Castilla-La Mancha", "seats": 6, "seats2023": 6, "valid": 387200, "PP": 0.363091, "PSOE": 0.312391, "Vox": 0.188428, "FA": 0.045746, "FV": 0.0, "Podemos": 0.033239, "SALF": 0.047511, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009594}, {"prov": "Valencia", "ccaa": "C. Valenciana", "seats": 16, "seats2023": 16, "valid": 1437161, "PP": 0.321532, "PSOE": 0.306824, "Vox": 0.145418, "FA": 0.0, "FV": 0.1615, "Podemos": 0.0, "SALF": 0.055168, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009558}, {"prov": "Valladolid", "ccaa": "Castilla y León", "seats": 5, "seats2023": 5, "valid": 316309, "PP": 0.397855, "PSOE": 0.319085, "Vox": 0.147684, "FA": 0.047645, "FV": 0.0, "Podemos": 0.038749, "SALF": 0.03924, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009743}, {"prov": "Zamora", "ccaa": "Castilla y León", "seats": 3, "seats2023": 3, "valid": 103410, "PP": 0.442121, "PSOE": 0.32158, "Vox": 0.130657, "FA": 0.030818, "FV": 0.0, "Podemos": 0.025064, "SALF": 0.039862, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009897}, {"prov": "Zaragoza", "ccaa": "Aragón", "seats": 7, "seats2023": 7, "valid": 518705, "PP": 0.348932, "PSOE": 0.298644, "Vox": 0.148289, "FA": 0.081691, "FV": 0.0, "Podemos": 0.048942, "SALF": 0.049277, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.014534, "Otros": 0.00969}, {"prov": "Álava", "ccaa": "País Vasco", "seats": 4, "seats2023": 4, "valid": 169107, "PP": 0.176889, "PSOE": 0.273865, "Vox": 0.038485, "FA": 0.063921, "FV": 0.0, "Podemos": 0.062317, "SALF": 0.017107, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.193137, "PNV": 0.164377, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.009901}, {"prov": "Ávila", "ccaa": "Castilla y León", "seats": 3, "seats2023": 3, "valid": 97956, "PP": 0.432531, "PSOE": 0.273878, "Vox": 0.153824, "FA": 0.028302, "FV": 0.0, "Podemos": 0.023017, "SALF": 0.040277, "ERC": 0.0, "Junts": 0.0, "EH Bildu": 0.0, "PNV": 0.0, "BNG": 0.0, "CC": 0.0, "AA": 0.0, "Existe": 0.0, "Otros": 0.048171}], "assumptions": {"C_FV": 0.7, "AA_BASE": 0.04}, "post": {"PP": {"mean": 31.816, "sd": 0.401, "tau": 1.001, "k": 17}, "PSOE": {"mean": 26.57, "sd": 0.285, "tau": 0.0, "k": 17}, "Vox": {"mean": 18.758, "sd": 0.252, "tau": 0.0, "k": 17}, "SUMESP": {"mean": 6.476, "sd": 0.284, "tau": 0.924, "k": 17}, "Podemos": {"mean": 3.007, "sd": 0.154, "tau": 0.404, "k": 17}, "SALF": {"mean": 1.653, "sd": 0.102, "tau": 0.088, "k": 13}, "ERC": {"mean": 2.191, "sd": 0.116, "tau": 0.0, "k": 11}, "Junts": {"mean": 1.497, "sd": 0.143, "tau": 0.315, "k": 11}, "EH Bildu": {"mean": 1.346, "sd": 0.096, "tau": 0.0, "k": 10}, "PNV": {"mean": 0.943, "sd": 0.08, "tau": 0.0, "k": 10}, "BNG": {"mean": 0.896, "sd": 0.081, "tau": 0.0, "k": 9}, "CC": {"mean": 0.423, "sd": 0.057, "tau": 0.0, "k": 9}, "UPN": {"mean": 0.183, "sd": 0.052, "tau": 0.0, "k": 7}, "AA": {"mean": 0.927, "sd": 0.092, "tau": 0.0, "k": 6}, "AC": {"mean": 1.1, "sd": 0.4, "tau": null, "k": 2}, "FVobs": {"mean": 1.098, "sd": 0.114, "tau": 0.0, "k": 4}}, "meta": {"poll_date": "17 de octubre de 2026", "window_from": "7 de septiembre de 2026", "half_life": 21, "n_polls": 17, "firms": ["EM-Analytics/Electomanía", "Sigma Dos/El Mundo", "SocioMétrica/El Español", "Target Point/El Debate", "40dB/Prisa", "GESOP/Prensa Ibérica", "GAD3/Vocento", "Hamalgama Métrica/Vozpópuli", "InvyMark/laSexta", "IMOP/El Confidencial", "DYM/Henneo", "CIS (Opina 360)", "NC Report/La Razón", "Data10/Okdiario", "Winston/Artículo14", "Ateneo del Dato/elDiario.es", "Celeste-Tel/Onda Cero"], "built": "22 de octubre de 2026"}}</script>
+<script>
+/*ENGINE-START*/
+const ENGINE=(function(){
+// Error del día de la elección calibrado con 2016, 2019-A, 2019-N y 2023 (media de los últimos 14 días frente a resultado):
+// error de bloque derecha/izquierda con desviación ~2,2 pts y anticorrelado; error propio de cada partido equivalente a n=1500.
+const BLOC_SD=0.022, IDIO_N=1500;
+function rngFactory(seed){let a=seed>>>0;const u=()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+  let spare=null;const n=()=>{if(spare!==null){const s=spare;spare=null;return s}let x,y,r;do{x=u()*2-1;y=u()*2-1;r=x*x+y*y}while(r>=1||r===0);const m=Math.sqrt(-2*Math.log(r)/r);spare=y*m;return x*m};return{u,n}}
+function dhondt(v,seats,valid,elig,out){const P=v.length;const w=new Float64Array(P);for(let i=0;i<P;i++)w[i]=(elig[i]&&v[i]>=0.03*valid)?v[i]:0;
+  const s=out||new Int32Array(P);s.fill(0);for(let k=0;k<seats;k++){let bi=0,bq=-1;for(let i=0;i<P;i++){const q=w[i]/(s[i]+1);if(q>bq||(q===bq&&w[i]>w[bi])){bq=q;bi=i}}s[bi]++}return s}
+function lastQuotients(v,seats,valid,elig){const P=v.length;const w=v.map((x,i)=>(elig[i]&&x>=0.03*valid)?x:0);const s=new Array(P).fill(0);const log=[];
+  for(let k=0;k<seats+3;k++){let bi=0,bq=-1;for(let i=0;i<P;i++){const q=w[i]/(s[i]+1);if(q>bq){bq=q;bi=i}}if(bq<=0)break;log.push({seat:k+1,party:bi,q:bq,won:k<seats});s[bi]++}return log}
+function setup(D){const P=D.parties,K=D.provinces.length;const B=D.provinces.map(r=>P.map(p=>r[p]));const V=D.provinces.map(r=>r.valid);const S=D.provinces.map(r=>r.seats);
+  const cc=[...new Set(D.provinces.map(r=>r.ccaa))].sort();const ci=D.provinces.map(r=>cc.indexOf(r.ccaa));const Vt=V.reduce((a,b)=>a+b,0);
+  const baseNat=P.map((p,j)=>B.reduce((a,row,k)=>a+row[j]*V[k],0)/Vt);const elig=P.map(p=>p!=='Otros');
+  const isNew=P.map(p=>['FV','Podemos','SALF','AA','Existe','FA'].includes(p));return{P,K,B,V,S,cc,ci,Vt,baseNat,elig,isNew}}
+function provShares(M,th,noiseFn){const {P,K,B,V,Vt,baseNat}=M;const NP=P.length;const sh=new Array(K);
+  for(let k=0;k<K;k++){const r=new Float64Array(NP);for(let j=0;j<NP;j++)r[j]=B[k][j]*(noiseFn?noiseFn(k,j):1);sh[k]=r}
+  let f=th.map((t,j)=>t/(baseNat[j]+1e-12));const x=sh.map(r=>new Float64Array(NP));
+  for(let it=0;it<5;it++){const nat=new Float64Array(NP);
+    for(let k=0;k<K;k++){let s=0;for(let j=0;j<NP;j++){x[k][j]=sh[k][j]*f[j];s+=x[k][j]}for(let j=0;j<NP;j++){x[k][j]/=s;nat[j]+=x[k][j]*V[k]/Vt}}
+    if(it<4)for(let j=0;j<NP;j++)f[j]=f[j]*th[j]/Math.max(nat[j],1e-9)}
+  return x}
+function central(M,mu){const {K,V,S,elig}=M;const x=provShares(M,mu,null);const seats=[],votes=[];
+  for(let k=0;k<K;k++){const v=Array.from(x[k],s=>s*V[k]);votes.push(v);seats.push(Array.from(dhondt(v,S[k],V[k],elig)))}return{shares:x,votes,seats}}
+function blocAfter(M,k,v,from,to,amt,iPP,iV){const w=v.slice();const m=Math.min(amt,w[from]);w[from]-=m;w[to]+=m;const s=dhondt(w,M.S[k],M.V[k],M.elig);return s[iPP]+s[iV]}
+function flipNeeded(M,k,v,from,to,iPP,iV){const s0=dhondt(v,M.S[k],M.V[k],M.elig);const b0=s0[iPP]+s0[iV];const step=M.V[k]*0.0005;const maxv=Math.min(v[from],M.V[k]*0.15);
+  for(let a=step;a<=maxv+1e-9;a+=step){const b=blocAfter(M,k,v,from,to,a,iPP,iV);if(b!==b0){let lo=a-step,hi=a;for(let t=0;t<14;t++){const mid=(lo+hi)/2;if(blocAfter(M,k,v,from,to,mid,iPP,iV)!==b0)hi=mid;else lo=mid}return{votes:Math.ceil(hi),d:b-b0}}}return null}
+function simulate(M,opt){const {P,K,V,S,cc,ci,elig,isNew}=M;const NP=P.length;const N=opt.N,rng=rngFactory(opt.seed||7);
+  const mu=opt.mu,sd=opt.sd,unc=opt.unc,delta=opt.delta;const iPP=P.indexOf('PP'),iV=P.indexOf('Vox');
+  const sr=P.map((p,j)=>isNew[j]?0.12:0.06),sp=P.map((p,j)=>isNew[j]?0.09:0.06);
+  const RIGHT=P.map(p=>['PP','Vox','SALF'].includes(p)),LEFT=P.map(p=>['PSOE','FA','FV','Podemos'].includes(p));
+  const muR=mu.reduce((a,x,j)=>a+(RIGHT[j]?x:0),0),muL=mu.reduce((a,x,j)=>a+(LEFT[j]?x:0),0);
+  const natSeats=P.map(()=>new Int32Array(N));const blocPV=new Int32Array(N);const voteR=new Float64Array(N),voteL=new Float64Array(N),voteO=new Float64Array(N);
+  const conc=new Float64Array(K),concNeg=new Float64Array(K),voxGain=new Float64Array(K),voxSeatsZero=new Float64Array(K),voxWaste=new Float64Array(K),provSeatSum=Array.from({length:K},()=>new Float64Array(NP));
+  const regN=new Float64Array(cc.length*NP),prvN=new Float64Array(K*NP);const tmp=new Int32Array(NP);
+  for(let n=0;n<N;n++){const th=new Float64Array(NP);let s=0;
+    const zb=rng.n()*BLOC_SD*unc;
+    for(let j=0;j<NP;j++){const idio=Math.sqrt(mu[j]*(1-mu[j])/IDIO_N)*unc;let b=0;if(RIGHT[j])b=zb*mu[j]/muR;else if(LEFT[j])b=-zb*mu[j]/muL;
+      th[j]=Math.max(mu[j]+b+rng.n()*Math.sqrt(sd[j]*sd[j]+idio*idio),1e-4);s+=th[j]}
+    for(let j=0;j<NP;j++)th[j]/=s;
+    {let r=0,l=0;for(let j=0;j<NP;j++){if(RIGHT[j])r+=th[j];else if(LEFT[j])l+=th[j]}voteR[n]=r;voteL[n]=l;voteO[n]=1-r-l}
+    for(let i=0;i<regN.length;i++)regN[i]=rng.n();for(let i=0;i<prvN.length;i++)prvN[i]=rng.n();
+    const x=provShares(M,th,(k,j)=>Math.exp(regN[ci[k]*NP+j]*sr[j]+prvN[k*NP+j]*sp[j]));
+    for(let k=0;k<K;k++){const v=new Array(NP);for(let j=0;j<NP;j++)v[j]=x[k][j]*V[k];
+      const s0=dhondt(v,S[k],V[k],elig,tmp);for(let j=0;j<NP;j++){natSeats[j][n]+=s0[j];provSeatSum[k][j]+=s0[j]}
+      const b0=s0[iPP]+s0[iV];if(s0[iV]===0){voxSeatsZero[k]++;voxWaste[k]+=v[iV]}
+      const amt=delta*V[k];const b1=blocAfter(M,k,v,iV,iPP,amt,iPP,iV);const b2=blocAfter(M,k,v,iPP,iV,amt,iPP,iV);
+      if(b1>b0)conc[k]++;if(b1<b0)concNeg[k]++;if(b2>b0)voxGain[k]++}
+    blocPV[n]=natSeats[iPP][n]+natSeats[iV][n]}
+  return{N,natSeats,blocPV,voteR,voteL,voteO,RIGHT,LEFT,conc:Array.from(conc,c=>c/N),concNeg:Array.from(concNeg,c=>c/N),voxGain:Array.from(voxGain,c=>c/N),
+    voxZero:Array.from(voxSeatsZero,c=>c/N),voxWasteVotes:Array.from(voxWaste,c=>c/N),provSeatMean:provSeatSum.map(r=>Array.from(r,c=>c/N))}}
+return{rngFactory,dhondt,lastQuotients,setup,provShares,central,flipNeeded,simulate}})();
+if(typeof module!=='undefined')module.exports=ENGINE;
+/*ENGINE-END*/
+</script>
+<script>
+(function(){
+const D=JSON.parse(document.getElementById('data').textContent);
+const M=ENGINE.setup(D);const P=D.parties;const NP=P.length;
+const NAME={PP:'PP (con UPN en Navarra)',PSOE:'PSOE',Vox:'Vox',FA:'Frente Amplio',FV:'Compromís (FV)',Podemos:'Podemos',SALF:'SALF',ERC:'ERC',Junts:'Junts','EH Bildu':'EH Bildu',PNV:'PNV',BNG:'BNG',CC:'CC',UPN:'UPN',AA:'Adelante And.',Existe:'Existe',Otros:'Otros'};
+const SHORT={FA:'FA',FV:'Compromís',AA:'Adelante','EH Bildu':'Bildu'};
+const COL={PP:'#1f77c9',PSOE:'#e2231a',Vox:'#4f9a2a',FA:'#d9316b',FV:'#ec7a1c',Podemos:'#6d2c7c',SALF:'#7a7f86',ERC:'#f2b705',Junts:'#22b5a6','EH Bildu':'#0d7a63',PNV:'#3d8b3d',BNG:'#7cc0ea',CC:'#e6c34a',UPN:'#24427c',AA:'#8fae3a',Existe:'#9a7b4f',Otros:'#b4b9b5'};
+const ORDER=['Podemos','FA','BNG','EH Bildu','ERC','AA','FV','PSOE','PNV','CC','Junts','Existe','PP','SALF','Vox','Otros'];
+const iPP=P.indexOf('PP'),iV=P.indexOf('Vox');
+const post=D.post;
+const pollMean={},pollSd={};
+for(const p of P){if(p==='Otros')continue;pollMean[p]=D.means[p].mean;pollSd[p]=D.means[p].sd}
+const SYS=p=>Math.sqrt(pollMean[p]/100*(1-pollMean[p]/100)/1500)*100;
+const state={mu:Object.assign({},pollMean),metric:'net',sel:P.indexOf('PP')>=0?D.provinces.findIndex(r=>r.prov==='Madrid'):0,sort:{k:'net',dir:-1}};
+const fmt=(x,d=1)=>x.toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=x=>fmt(x*100,0)+'%';
+const $=id=>document.getElementById(id);
+// sliders
+const SLMAX={PP:45,PSOE:40,Vox:32};
+const sw=$('sliders');
+for(const p of P){if(p==='Otros')continue;const max=SLMAX[p]||12;const id='s-'+p.replace(/\W/g,'');
+  const lo=Math.max(0,pollMean[p]-2*Math.hypot(pollSd[p],SYS(p))),hi=Math.min(max,pollMean[p]+2*Math.hypot(pollSd[p],SYS(p)));
+  const d=document.createElement('div');d.className='sl';
+  d.innerHTML=`<label for="${id}"><span class="sw" style="background:${COL[p]}"></span>${SHORT[p]||p}</label><div class="track"><span class="pm" style="left:${lo/max*100}%;width:${(hi-lo)/max*100}%"></span><input id="${id}" type="range" min="0" max="${max}" step="0.1" value="${state.mu[p]}"></div><output id="o-${id}">${fmt(state.mu[p])}</output>`;
+  sw.appendChild(d);d.querySelector('input').addEventListener('input',e=>{state.mu[p]=+e.target.value;syncOut();schedule()})}
+function syncOut(){let s=0;for(const p of P){if(p==='Otros')continue;s+=state.mu[p];const id='s-'+p.replace(/\W/g,'');$(id).value=state.mu[p];$('o-'+id).textContent=fmt(state.mu[p])}
+  const o=100-s;$('o-otros').textContent=fmt(o);$('o-otros').style.color=o<0.5?'var(--warn)':''}
+$('b-err43').onclick=()=>{$('unc').value=2.9;$('o-unc').textContent='2,9 pts';schedule()};$('b-err14').onclick=()=>{$('unc').value=2.2;$('o-unc').textContent='2,2 pts';schedule()};
+$('b-reset').onclick=()=>{state.mu=Object.assign({},pollMean);syncOut();schedule()};
+document.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{const [a,c,x]=b.dataset.move.split(',');const m=Math.min(+x,state.mu[a]);state.mu[a]=+(state.mu[a]-m).toFixed(1);state.mu[c]=+(state.mu[c]+m).toFixed(1);syncOut();schedule()});
+$('unc').addEventListener('input',()=>{if(R)renderErr()});
+for(const [id,f] of [['unc',v=>fmt(+v)+' pts'],['delta',v=>fmt(+v)],['nsim',v=>v]]){$(id).addEventListener('input',e=>{$('o-'+id).textContent=f(e.target.value);schedule()})}
+function muVec(){let s=0;const v=P.map(p=>{if(p==='Otros')return 0;s+=state.mu[p];return state.mu[p]/100});v[P.indexOf('Otros')]=Math.max(100-s,0.5)/100;const t=v.reduce((a,b)=>a+b,0);return v.map(x=>x/t)}
+function sdVec(){return P.map(p=>p==='Otros'?0.003:pollSd[p]/100)}
+let timer=null,C=null,R=null;
+function schedule(){clearTimeout(timer);$('status').textContent='Calculando…';timer=setTimeout(run,180)}
+function run(){const mu=muVec();C=ENGINE.central(M,mu);C.flip=D.provinces.map((r,k)=>({toPP:ENGINE.flipNeeded(M,k,C.votes[k],iV,iPP,iPP,iV),toVox:ENGINE.flipNeeded(M,k,C.votes[k],iPP,iV,iPP,iV)}));
+  renderHemi();setTimeout(()=>{const t0=performance.now();R=ENGINE.simulate(M,{N:+$('nsim').value,mu,sd:sdVec(),unc:+$('unc').value/2.2,delta:+$('delta').value/100,seed:11});
+    const dt=performance.now()-t0;$('status').textContent=`${R.N.toLocaleString('es-ES')} simulaciones · ${fmt(dt/1000,1)} s · encuestas hasta ${D.meta.poll_date}`;renderAll()},20)}
+function q(arr,p){const a=Array.from(arr).sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor(p*(a.length-1)))]}
+function renderAll(){renderKpis();renderBars();renderBlocs();renderErr();renderMap();renderDetail();renderTable()}
+function renderKpis(){const b=R.blocPV,N=R.N;const iC=P.indexOf('CC'),iS=P.indexOf('SALF'),iPS=P.indexOf('PSOE');
+  let maj=0,majExt=0,ppPsoe=0,ppAlone=0;for(let n=0;n<N;n++){if(b[n]>=176)maj++;if(b[n]+R.natSeats[iC][n]+R.natSeats[iS][n]>=176)majExt++;if(R.natSeats[iPP][n]>R.natSeats[iPS][n])ppPsoe++}
+  const cb=C.seats.reduce((a,s)=>a+s[iPP]+s[iV],0);
+  $('kpis').innerHTML=[[pct(maj/N),'Probabilidad de que PP + Vox sumen 176 o más'],[pct(majExt/N),'Con CC y SALF'],[fmt(q(b,0.5),0)+' <small class="mono" style="font-size:14px">('+q(b,0.05)+'–'+q(b,0.95)+')</small>','Escaños de PP + Vox, mediana e intervalo del 90%'],[pct(ppPsoe/N),'Probabilidad de que el PP saque más escaños que el PSOE']]
+   .map(([v,l])=>`<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');}
+
+const BLOCS=[{k:'R',name:'Derecha',col:'var(--pp)'},{k:'L',name:'Izquierda',col:'#e2231a'},{k:'O',name:'Otros',col:'#9a7b4f'}];
+function renderBlocs(){const N=R.N;const seats={R:new Int32Array(N),L:new Int32Array(N),O:new Int32Array(N)};
+  for(let j=0;j<NP;j++){const key=R.RIGHT[j]?'R':R.LEFT[j]?'L':'O';const a=R.natSeats[j];for(let n=0;n<N;n++)seats[key][n]+=a[n]}
+  const W=640,H=230,ml=34,mr=12,mt=14,mb=34,x=v=>ml+v/350*(W-ml-mr);const bw=5;const hist={};let ymax=0;
+  for(const b of BLOCS){const h=new Array(Math.ceil(351/bw)).fill(0);for(let n=0;n<N;n++)h[Math.floor(seats[b.k][n]/bw)]++;hist[b.k]=h}
+  const y=(v,mx)=>H-mb-v/mx*(H-mt-mb);let s='';
+  for(let v=0;v<=350;v+=50){s+=`<line x1="${x(v)}" y1="${mt}" x2="${x(v)}" y2="${H-mb}" stroke="var(--line)" stroke-width="1"/><text x="${x(v)}" y="${H-mb+16}" text-anchor="middle" style="font:11px var(--f-mono);fill:var(--muted)">${v}</text>`}
+  s+=`<text x="${(W+ml)/2}" y="${H-4}" text-anchor="middle" style="font:11px var(--f-body);fill:var(--muted)">escaños</text>`;
+  for(const b of BLOCS){const mx=Math.max(...hist[b.k]);let d=`M${x(0)},${y(0,mx)}`;hist[b.k].forEach((c,i)=>{d+=`L${x(i*bw)},${y(c,mx)}L${x(Math.min((i+1)*bw,350))},${y(c,mx)}`});d+=`L${x(350)},${y(0,mx)}Z`;
+    s+=`<path d="${d}" fill="${b.col}" fill-opacity="0.22" stroke="${b.col}" stroke-width="1.5"/>`}
+  s+=`<line x1="${x(176)}" y1="${mt-4}" x2="${x(176)}" y2="${H-mb}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${x(176)+5}" y="${mt+6}" style="font:600 11px var(--f-mono)">176</text>`;
+  s+=`<line x1="${ml}" y1="${H-mb}" x2="${W-mr}" y2="${H-mb}" stroke="var(--muted)"/>`;
+  $('blocs').innerHTML=s;
+  const vote={R:R.voteR,L:R.voteL,O:R.voteO};const cseat=k=>C.seats.reduce((a,sv)=>a+sv.reduce((b,c,j)=>b+(((R.RIGHT[j]?'R':R.LEFT[j]?'L':'O')===k)?c:0),0),0);
+  $('bloc-tbl').innerHTML=`<thead><tr><th>Bloque</th><th>Voto mediano</th><th>Voto 90%</th><th>Escaños central</th><th>Escaños mediana</th><th>Escaños 90%</th><th>P(≥176)</th></tr></thead><tbody>`+
+   BLOCS.map(b=>{const sv=seats[b.k],vv=vote[b.k];let m=0;for(let n=0;n<N;n++)if(sv[n]>=176)m++;
+    return `<tr><td><span class="sw" style="background:${b.col};display:inline-block;margin-right:6px"></span>${b.name}</td><td class="num">${fmt(q(vv,.5)*100)}%</td><td class="num">${fmt(q(vv,.05)*100)}–${fmt(q(vv,.95)*100)}</td><td class="num">${cseat(b.k)}</td><td class="num">${q(sv,.5)}</td><td class="num">${q(sv,.05)}–${q(sv,.95)}</td><td class="num">${pct(m/N)}</td></tr>`}).join('')+'</tbody>'}
+
+const HZ=[{h:3,r:2.19,l:1.70},{h:7,r:2.25,l:1.88},{h:14,r:2.23,l:1.80},{h:21,r:2.31,l:2.14},{h:30,r:2.90,l:2.81},{h:45,r:2.88,l:4.28},{h:60,r:4.03,l:2.54},{h:90,r:4.80,l:6.97}];const POLL_DAYS=43;
+function renderErr(){const W=320,Hh=170,ml=24,mr=6,mt=14,mb=30;const xmax=95,ymax=7.5;const x=d=>ml+(xmax-d)/xmax*(W-ml-mr),y=v=>Hh-mb-v/ymax*(Hh-mt-mb);let s='';
+  for(let v=0;v<=7;v+=1){if(v%2)continue;s+=`<line x1="${ml}" y1="${y(v)}" x2="${W-mr}" y2="${y(v)}" stroke="var(--line)"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end" style="font:10px var(--f-mono);fill:var(--muted)">${v}</text>`}
+  for(const d of [90,60,30,14,0]){s+=`<text x="${x(d)}" y="${Hh-mb+16}" text-anchor="middle" style="font:10px var(--f-mono);fill:var(--muted)">${d}</text>`}
+  s+=`<text x="${(W+ml)/2}" y="${Hh-4}" text-anchor="middle" style="font:10px var(--f-body);fill:var(--muted)">días hasta la elección</text><text x="2" y="${mt-4}" style="font:10px var(--f-body);fill:var(--muted)">pts</text>`;
+  for(const [k,c] of [['r','var(--pp)'],['l','#e2231a']]){s+=`<polyline fill="none" stroke="${c}" stroke-width="2" points="${HZ.map(p=>x(p.h)+','+y(p[k])).join(' ')}"/>`+HZ.map(p=>`<circle cx="${x(p.h)}" cy="${y(p[k])}" r="2.5" fill="${c}"/>`).join('')}
+  const u=+$('unc').value;s+=`<line x1="${ml}" y1="${y(u)}" x2="${W-mr}" y2="${y(u)}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W-mr}" y="${y(u)-5}" text-anchor="end" style="font:600 10px var(--f-mono)">${fmt(u)} pts</text>`;
+  s+=`<line x1="${x(POLL_DAYS)}" y1="${mt}" x2="${x(POLL_DAYS)}" y2="${Hh-mb}" stroke="var(--accent)" stroke-width="1.5"/><text x="${x(POLL_DAYS)+4}" y="${mt+4}" style="font:600 10px var(--f-mono);fill:var(--accent)">hoy (${POLL_DAYS} d)</text>`;
+  s+=`<line x1="${ml}" y1="${Hh-mb}" x2="${W-mr}" y2="${Hh-mb}" stroke="var(--muted)"/>`;$('errcurve').innerHTML=s;
+  $('err-read').textContent=`Con ${fmt(u)} pts, el voto de PP+Vox caería en el 90% de los casos a unos ±${fmt(1.645*u)} pts de tus supuestos.`}
+function renderBars(){const rows=P.map((p,j)=>({p,j,med:q(R.natSeats[j],.5),lo:q(R.natSeats[j],.05),hi:q(R.natSeats[j],.95),c:C.seats.reduce((a,s)=>a+s[j],0)})).filter(r=>r.hi>0||r.c>0).sort((a,b)=>b.med-a.med||b.hi-a.hi);
+  const mx=Math.max(...rows.map(r=>r.hi),10);
+  $('bars').innerHTML=rows.map(r=>`<div class="bar"><span><span class="sw" style="background:${COL[r.p]};display:inline-block;margin-right:5px"></span>${SHORT[r.p]||r.p}</span><div class="t"><i style="left:${r.lo/mx*100}%;width:${Math.max((r.hi-r.lo)/mx*100,.6)}%;background:${COL[r.p]}"></i><em style="left:calc(${r.med/mx*100}% - 1.5px);background:${COL[r.p]}"></em></div><span class="v">${r.med} <span class="muted">${r.lo}–${r.hi}</span></span></div>`).join('')}
+function renderHemi(){const tot=P.map((p,j)=>C.seats.reduce((a,s)=>a+s[j],0));const seq=[];for(const p of ORDER){const j=P.indexOf(p);for(let i=0;i<tot[j];i++)seq.push(p)}
+  const rows=12,cx=260,cy=270,r0=95,r1=255;const pos=[];const rs=[];for(let i=0;i<rows;i++)rs.push(r0+(r1-r0)*i/(rows-1));const L=rs.reduce((a,r)=>a+r,0);
+  let cnt=rs.map(r=>Math.round(350*r/L));let diff=350-cnt.reduce((a,b)=>a+b,0);cnt[rows-1]+=diff;
+  rs.forEach((r,i)=>{for(let k=0;k<cnt[i];k++){const a=Math.PI*(1-(k+0.5)/cnt[i]);pos.push({a,x:cx+r*Math.cos(a),y:cy-r*Math.sin(a)})}});pos.sort((a,b)=>b.a-a.a);
+  let s='';pos.forEach((p,i)=>{s+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.6" fill="${COL[seq[i]]||'#999'}"/>`});
+  const bloc=tot[iPP]+tot[iV];
+  s+=`<line x1="${cx}" y1="${cy-r1-12}" x2="${cx}" y2="${cy-r0+8}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  s+=`<text x="${cx}" y="${cy-28}" text-anchor="middle" style="font:800 46px var(--f-display);font-stretch:80%">${bloc}</text><text x="${cx}" y="${cy-6}" text-anchor="middle" style="font:500 12px var(--f-mono);fill:var(--muted)">PP + Vox · mayoría 176</text>`;
+  $('hemi').innerHTML=s;$('hemi-leg').innerHTML=ORDER.filter(p=>tot[P.indexOf(p)]>0).map(p=>`<span><span class="sw" style="background:${COL[p]};display:inline-block;vertical-align:-1px;margin-right:4px"></span>${SHORT[p]||p} <b class="mono">${tot[P.indexOf(p)]}</b></span>`).join('')}
+// --- mapa de mosaicos ---
+const GRID={'A Coruña':[0,0],'Lugo':[1,0],'Asturias':[2,0],'Cantabria':[3,0],'Bizkaia':[4,0],'Gipuzkoa':[5,0],
+'Pontevedra':[0,1],'Ourense':[1,1],'León':[2,1],'Palencia':[3,1],'Burgos':[4,1],'Álava':[5,1],'Navarra':[6,1],'Huesca':[7,1],'Lleida':[8,1],'Girona':[9,1],
+'Zamora':[1,2],'Valladolid':[2,2],'Segovia':[3,2],'Soria':[4,2],'La Rioja':[5,2],'Zaragoza':[6,2],'Teruel':[7,2],'Tarragona':[8,2],'Barcelona':[9,2],
+'Salamanca':[1,3],'Ávila':[2,3],'Madrid':[3,3],'Guadalajara':[4,3],'Cuenca':[5,3],'Valencia':[6,3],'Castellón':[7,3],'Baleares':[9,3],
+'Cáceres':[1,4],'Toledo':[2,4],'Ciudad Real':[3,4],'Albacete':[4,4],'Murcia':[5,4],'Alicante':[6,4],
+'Badajoz':[1,5],'Córdoba':[2,5],'Jaén':[3,5],'Granada':[4,5],'Almería':[5,5],
+'Huelva':[1,6],'Sevilla':[2,6],'Málaga':[3,6],
+'S.C. Tenerife':[0,7],'Las Palmas':[1,7],'Cádiz':[2,7],'Ceuta':[3,7],'Melilla':[5,7]};
+const ABBR={'A Coruña':'C','Lugo':'LU','Asturias':'O','Cantabria':'S','Bizkaia':'BI','Gipuzkoa':'SS','Pontevedra':'PO','Ourense':'OU','León':'LE','Palencia':'P','Burgos':'BU','Álava':'VI','Navarra':'NA','Huesca':'HU','Lleida':'L','Girona':'GI','Zamora':'ZA','Valladolid':'VA','Segovia':'SG','Soria':'SO','La Rioja':'LO','Zaragoza':'Z','Teruel':'TE','Tarragona':'T','Barcelona':'B','Salamanca':'SA','Ávila':'AV','Madrid':'M','Guadalajara':'GU','Cuenca':'CU','Valencia':'V','Castellón':'CS','Baleares':'PM','Cáceres':'CC','Toledo':'TO','Ciudad Real':'CR','Albacete':'AB','Murcia':'MU','Alicante':'A','Badajoz':'BA','Córdoba':'CO','Jaén':'J','Granada':'GR','Almería':'AL','Huelva':'H','Sevilla':'SE','Málaga':'MA','S.C. Tenerife':'TF','Las Palmas':'GC','Cádiz':'CA','Ceuta':'CE','Melilla':'ML'};
+function metricVal(k){const m=state.metric;if(m==='net')return R.voxGain[k]-R.conc[k];if(m==='conc')return R.conc[k];if(m==='vox')return R.voxGain[k];if(m==='waste')return R.voxZero[k];return 0}
+function mix(c1,t){return `color-mix(in srgb, ${c1} ${Math.round(Math.min(Math.abs(t),1)*100)}%, var(--neutral-tile))`}
+function tileColor(v){const m=state.metric;if(m==='net'){const t=Math.max(-1,Math.min(1,v/0.25));return t>=0?mix('var(--vox)',t):mix('var(--pp)',-t)}
+  if(m==='conc')return mix('var(--pp)',v/0.3);if(m==='vox')return mix('var(--vox)',v/0.3);return mix('var(--warn)',v)}
+function tileText(v){const m=state.metric;if(m==='net'){const x=Math.round(v*100);return(x>0?'+':'')+x}return Math.round(v*100)+'%'}
+const HINT={net:'Diferencia entre la probabilidad de que pasar voto de PP a Vox haga ganar un escaño al bloque PP+Vox y la de que lo haga ganar concentrarlo en PP, en puntos. Verde: el voto a Vox rinde más que el voto al PP. Azul: rinde más concentrar en PP. Gris: da igual.',
+ conc:'Probabilidad de que mover el trasvase elegido de Vox a PP haga ganar un escaño al bloque PP+Vox.',
+ vox:'Probabilidad de que mover el trasvase elegido de PP a Vox haga ganar un escaño al bloque PP+Vox.',
+ waste:'Probabilidad de que Vox se quede sin escaño en la provincia, de modo que todo su voto allí no elige a nadie.'};
+function renderMap(){$('map-tip').textContent='Mide, provincia a provincia, si a la suma de PP y Vox le conviene más que el voto vaya a Vox o que se concentre en el PP. '+HINT[state.metric];$('map-hint').textContent=`Trasvase usado: ${fmt(+$('delta').value)} puntos del voto de cada provincia (cámbialo en el panel de supuestos).`;
+  const cells=[];for(let r=0;r<8;r++)for(let c=0;c<10;c++)cells.push(null);D.provinces.forEach((p,k)=>{const g=GRID[p.prov];if(g)cells[g[1]*10+g[0]]=k});
+  $('map').innerHTML=cells.map(k=>{if(k===null)return '<div class="tile empty"></div>';const v=metricVal(k);const p=D.provinces[k];
+    return `<div class="tile${k===state.sel?' sel':''}" data-k="${k}" style="background:${tileColor(v)}" tabindex="0" role="button" aria-label="${p.prov}"><span class="n">${p.prov}</span><span class="a">${ABBR[p.prov]||p.prov.slice(0,2)}</span><span class="m">${tileText(v)}</span></div>`}).join('');
+  $('map').querySelectorAll('.tile[data-k]').forEach(t=>{const f=()=>{state.sel=+t.dataset.k;renderMap();renderDetail();($('detail-sect').open=true,$('detail-sect').scrollIntoView({behavior:'smooth',block:'nearest'}))};t.onclick=f;t.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();f()}}});
+  const m=state.metric;$('map-leg').innerHTML=m==='net'?`<span>Rinde más PP</span><span class="ramp" style="background:linear-gradient(90deg,var(--pp),var(--neutral-tile),var(--vox))"></span><span>Rinde más Vox</span><span class="mono">escala ±25 pts</span>`:
+   `<span>0%</span><span class="ramp" style="background:linear-gradient(90deg,var(--neutral-tile),${m==='conc'?'var(--pp)':m==='vox'?'var(--vox)':'var(--warn)'})"></span><span>${m==='waste'?'100%':'30% o más'}</span>`}
+document.querySelectorAll('[data-metric]').forEach(b=>b.onclick=()=>{state.metric=b.dataset.metric;document.querySelectorAll('[data-metric]').forEach(x=>x.classList.toggle('primary',x===b));renderMap()});
+function verdict(k){const net=R.voxGain[k]-R.conc[k];if(net>0.05)return['Rinde más Vox','c-vox'];if(net<-0.05)return['Rinde más PP','c-pp'];return['Indiferente','c-neu']}
+function flipTxt(f){if(!f)return '<span class="muted">más de 15 pts</span>';return `${f.votes.toLocaleString('es-ES')} <span class="${f.d>0?'c-vox':'c-pp'}" style="font-weight:600">${f.d>0?'+':''}${f.d}</span>`}
+function renderDetail(){const k=state.sel,p=D.provinces[k];const s=C.seats[k];const v=C.votes[k];const sh=C.shares[k];const [vt,vc]=verdict(k);
+  const lq=ENGINE.lastQuotients(v,p.seats,p.valid,M.elig);const won=lq.filter(x=>x.won);const last=won[won.length-1];const next=lq.filter(x=>!x.won).slice(0,3);
+  const parties=P.map((x,j)=>({x,j})).filter(o=>sh[o.j]>0.005).sort((a,b)=>sh[b.j]-sh[a.j]);
+  const f=C.flip[k];
+  $('detail').innerHTML=`<div class="stack" style="gap:2px"><span class="eyebrow">${p.ccaa} · ${p.seats} escaños · ${p.valid.toLocaleString('es-ES')} votos válidos en 2023</span><h2>${p.prov} <span class="chip ${vc}" style="vertical-align:3px;margin-left:6px">${vt}</span></h2></div>
+  <div class="detail"><div class="tablewrap"><table><thead><tr><th>Partido</th><th>% central</th><th>Escaños central</th><th>Escaños medios</th></tr></thead><tbody>
+  ${parties.map(o=>`<tr><td><span class="sw" style="background:${COL[o.x]};display:inline-block;margin-right:6px"></span>${NAME[o.x]}</td><td class="num">${fmt(sh[o.j]*100)}</td><td class="num">${s[o.j]}</td><td class="num">${fmt(R.provSeatMean[k][o.j])}</td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="stack" style="gap:10px">
+    <div><h3>El último escaño y los siguientes cocientes</h3>
+    <p class="hint" style="margin:4px 0 6px">Cociente D'Hondt = votos ÷ (escaños ya ganados + 1). El último cociente que entra fija el precio del escaño.</p>
+    <table><tbody>${[last,...next].filter(Boolean).map(x=>`<tr><td>${x.won?'Escaño '+x.seat+' (último)':'Siguiente'}</td><td><span class="sw" style="background:${COL[P[x.party]]};display:inline-block;margin-right:6px"></span>${NAME[P[x.party]]}</td><td class="num">${Math.round(x.q).toLocaleString('es-ES')}</td></tr>`).join('')}</tbody></table></div>
+    <div><h3>Voto útil en ${p.prov}</h3>
+    <table><tbody>
+      <tr><td>Concentrar ${fmt(+$('delta').value)} pts de Vox en PP suma escaño</td><td class="num">${pct(R.conc[k])}</td></tr>
+      <tr><td>Concentrar ${fmt(+$('delta').value)} pts de Vox en PP resta escaño</td><td class="num">${pct(R.concNeg[k])}</td></tr>
+      <tr><td>Pasar ${fmt(+$('delta').value)} pts de PP a Vox suma escaño</td><td class="num">${pct(R.voxGain[k])}</td></tr>
+      <tr><td>Vox se queda sin escaño</td><td class="num">${pct(R.voxZero[k])}</td></tr>
+      <tr><td>Votos de Vox a PP para cambiar el bloque (central)</td><td class="num">${flipTxt(f.toPP)}</td></tr>
+      <tr><td>Votos de PP a Vox para cambiar el bloque (central)</td><td class="num">${flipTxt(f.toVox)}</td></tr>
+    </tbody></table></div>
+  </div></div>`}
+const COLS=[['prov','Provincia'],['seats','Esc.'],['pp','PP'],['vox','Vox'],['bloc','PP+Vox'],['net','Ventaja Vox'],['conc','Concentrar suma'],['vg','A Vox suma'],['zero','Vox sin escaño'],['fpp','Votos Vox→PP'],['fvx','Votos PP→Vox'],['ver','Lectura']];
+function renderTable(){const rows=D.provinces.map((p,k)=>({k,prov:p.prov,seats:p.seats,pp:C.seats[k][iPP],vox:C.seats[k][iV],bloc:C.seats[k][iPP]+C.seats[k][iV],net:R.voxGain[k]-R.conc[k],conc:R.conc[k],vg:R.voxGain[k],zero:R.voxZero[k],
+    fpp:C.flip[k].toPP?C.flip[k].toPP.votes:1e12,fvx:C.flip[k].toVox?C.flip[k].toVox.votes:1e12,ver:verdict(k)}));
+  const {k:sk,dir}=state.sort;rows.sort((a,b)=>{const x=a[sk],y=b[sk];if(sk==='ver')return dir*(a.net-b.net);return typeof x==='string'?dir*x.localeCompare(y,'es'):dir*(x-y)});
+  $('tbl').innerHTML=`<thead><tr>${COLS.map(([c,l])=>`<th data-c="${c}">${l}${sk===c?(dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="clk" data-k="${r.k}"><td>${r.prov}</td><td class="num">${r.seats}</td><td class="num">${r.pp}</td><td class="num">${r.vox}</td><td class="num">${r.bloc}</td><td class="num">${(r.net>0?'+':'')+Math.round(r.net*100)}</td><td class="num">${pct(r.conc)}</td><td class="num">${pct(r.vg)}</td><td class="num">${pct(r.zero)}</td><td class="num">${flipTxt(C.flip[r.k].toPP)}</td><td class="num">${flipTxt(C.flip[r.k].toVox)}</td><td><span class="chip ${r.ver[1]}">${r.ver[0]}</span></td></tr>`).join('')}</tbody>`;
+  $('tbl').querySelectorAll('th').forEach(th=>th.onclick=()=>{const c=th.dataset.c;state.sort={k:c,dir:state.sort.k===c?-state.sort.dir:(c==='prov'?1:-1)};renderTable()});
+  $('tbl').querySelectorAll('tr.clk').forEach(tr=>tr.onclick=()=>{state.sel=+tr.dataset.k;renderMap();renderDetail();($('detail-sect').open=true,$('detail-sect').scrollIntoView({behavior:'smooth',block:'nearest'}))})}
+// metodología
+const firms=D.meta.firms.join(', ');
+$('method').innerHTML=`<h2>Cómo está hecho</h2>
+<p><b>Base.</b> Resultados definitivos del 23-J (con CERA) en las 52 circunscripciones. El motor D'Hondt, con umbral del 3% sobre voto válido (incluye blanco), reproduce los 350 escaños oficiales provincia por provincia (137 PP, 121 PSOE, 33 Vox, 31 Sumar, 7 ERC, 7 Junts, 6 Bildu, 5 PNV, 1 BNG, 1 CC, 1 UPN).</p>
+<p><b>Encuestas.</b> ${D.meta.n_polls} encuestas publicadas entre el ${D.meta.window_from} y el ${D.meta.poll_date}, la más reciente de cada empresa: ${firms}. Se excluyen las encargadas por partidos. Para cada partido se combina un prior centrado en el 23-J (desviación de 5 pts) con las encuestas, ponderadas por tamaño de muestra y por antigüedad (vida media de ${D.meta.half_life} días). La dispersión entre empresas entra como varianza adicional. Sobre esa media se añade el error de las encuestas el día de la votación, que es lo que más pesa. Está calibrado con las cuatro últimas generales, comparando la media de las encuestas de las dos últimas semanas con el resultado:</p>
+<div class="tablewrap"><table style="max-width:560px"><thead><tr><th>Elección</th><th>Error bloque derecha</th><th>Error bloque izquierda</th></tr></thead><tbody>
+<tr><td>2016</td><td class="num">−2,2</td><td class="num">+2,2</td></tr>
+<tr><td>Abril 2019</td><td class="num">+3,5</td><td class="num">−0,7</td></tr>
+<tr><td>Noviembre 2019</td><td class="num">+0,4</td><td class="num">0,0</td></tr>
+<tr><td>2023</td><td class="num">+1,7</td><td class="num">−2,5</td></tr></tbody></table></div>
+<p>Puntos de encuesta menos resultado. Derecha: PP, Vox y Cs. Izquierda: PSOE y el espacio Podemos/Sumar/Más País. El modelo sortea un error común de bloque (lo que suma a un lado lo resta al otro) más un error propio de cada partido. El control «Error» fija la desviación del error de bloque en puntos; por defecto, 2,9 pts, el error histórico a 43 días de la elección, que es la distancia de las encuestas actuales. A final de campaña el histórico es de 2,2 pts. Con solo cuatro elecciones, esta calibración es orientativa.</p>
+<p><b>De lo nacional a lo provincial.</b> Swing proporcional: cada partido mantiene su perfil territorial de 2023 y se reescala hasta cuadrar con el voto nacional elegido (ajuste iterativo). Cada simulación añade ruido regional y provincial (~6% relativo cada uno, el doble en partidos nuevos), porque el voto no se mueve igual en todas partes. La participación por provincia se fija en la de 2023. Los escaños por provincia son los del Real Decreto 806/2026 de convocatoria: Madrid pasa de 37 a 38 y Cádiz de 9 a 8.</p>
+<p><b>Candidaturas del 29-N.</b> Las listas siguen los acuerdos cerrados para estas elecciones:</p>
+<ul>
+<li>Podemos no se presenta en Cataluña y apoya a ERC: su voto allí pasa a ERC.</li>
+<li>En la Comunidad Valenciana, Compromís, Podemos y EUPV van juntos en Compromís-Front Valencià: todo ese espacio se cuenta como Compromís.</li>
+<li>En Canarias, Podemos, IU, Sumar y Nueva Canarias van juntos en Unidad del Pueblo Canario, que se cuenta como Frente Amplio. CC va con Primero Canarias.</li>
+<li>UPN va en coalición con el PP en Navarra, así que su voto se suma al PP.</li>
+<li>Frente Amplio (CHA-Frente Amplio Aragón) no se presenta en Teruel. Coalición Existe se presenta en Aragón con su resultado de 2023 como base. Las encuestas no la publican.</li>
+<li>Aliança Catalana no se presenta. CUP, PRC y Foro tampoco.</li>
+</ul>
+<p>Cuando una lista se integra en otra, la media de encuestas del partido que desaparece en ese territorio se reparte en proporción a su peso allí en la base. Puede que algunas encuestas ya lo hayan hecho, así que el reparto es aproximado.</p>
+<p><b>Partidos que no existían en 2023.</b> Supuestos con los que conviene tener cuidado:</p>
+<ul>
+<li>Podemos se separa de Sumar 2023 con su peso relativo en cada comunidad en las europeas de 2024.</li>
+<li>SALF toma el perfil por comunidad de las europeas de 2024.</li>
+<li>Adelante Andalucía recibe un perfil uniforme en Andalucía.</li>
+</ul>
+<p><b>Voto útil.</b> En cada simulación y provincia se mueve el trasvase elegido de Vox a PP y de PP a Vox, se recalcula el reparto y se mira si cambian los escaños de PP+Vox. «Ventaja Vox» es la probabilidad de que pasar voto a Vox sume escaño menos la de que concentrarlo en PP sume. «Votos para cambiar» busca, en el escenario central, el menor trasvase que altera los escaños del bloque.</p>
+<p><b>Lo que el modelo no hace.</b> No modela efectos de casa por empresa, cambios de participación ni transferencias de voto distintas por provincia. Tampoco distingue errores por territorio: si las encuestas fallan más en una comunidad que en otra, solo lo recoge el ruido regional.</p>
+
+<p class="hint">Fuentes: Wikipedia, «Results breakdown of the 2023 Spanish general election (Congress)», páginas de cada circunscripción, «Results breakdown of the 2024 European Parliament election in Spain» y «Opinion polling for the next Spanish general election», y BOE-A-2026-20742 (Real Decreto 806/2026), consultados el ${D.meta.built}.</p>`;
+document.querySelectorAll('.info').forEach(el=>{el.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();el.focus()});el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation()}})});
+syncOut();run();
+})();
+</script>
+
+</body></html>
