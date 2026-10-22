@@ -221,7 +221,7 @@ tr.clk{cursor:pointer} tr.clk:hover td{background:var(--surface-2)}
 </div>
 
 <script id="data" type="application/json">__DATA__</script>
-<script>
+<script id="engine-src">
 /*ENGINE-START*/
 const ENGINE=(function(){
 // Error del día de la elección calibrado con 2016, 2019-A, 2019-N y 2023 (media de los últimos 14 días frente a resultado):
@@ -314,8 +314,15 @@ function sdVec(){return P.map(p=>p==='Otros'?0.003:pollSd[p]/100)}
 let timer=null,C=null,R=null;
 function schedule(){clearTimeout(timer);$('status').textContent='Calculando…';timer=setTimeout(run,180)}
 function run(){const mu=muVec();C=ENGINE.central(M,mu);C.flip=D.provinces.map((r,k)=>({toPP:ENGINE.flipNeeded(M,k,C.votes[k],iV,iPP,iPP,iV),toVox:ENGINE.flipNeeded(M,k,C.votes[k],iPP,iV,iPP,iV)}));
-  renderHemi();setTimeout(()=>{const t0=performance.now();R=ENGINE.simulate(M,{N:+$('nsim').value,mu,sd:sdVec(),unc:+$('unc').value/2.2,delta:+$('delta').value/100,seed:11});
-    const dt=performance.now()-t0;$('status').textContent=`${R.N.toLocaleString('es-ES')} simulaciones · ${fmt(dt/1000,1)} s · encuestas hasta ${D.meta.poll_date}`;renderAll()},20)}
+  renderHemi();const opt={N:+$('nsim').value,mu,sd:sdVec(),unc:+$('unc').value/2.2,delta:+$('delta').value/100,seed:11};const t0=performance.now();
+  const done=res=>{R=res;const dt=performance.now()-t0;$('status').textContent=`${R.N.toLocaleString('es-ES')} simulaciones · ${fmt(dt/1000,1)} s · encuestas hasta ${D.meta.poll_date}`;renderAll()};
+  const w=getWorker();if(w){w.onmessage=e=>done(e.data);w.onerror=()=>{workerBroken=true;worker=null;setTimeout(()=>done(ENGINE.simulate(M,opt)),20)};w.postMessage({D,opt})}
+  else setTimeout(()=>done(ENGINE.simulate(M,opt)),20)}
+// La simulación corre en un Web Worker para que la página no se bloquee; cada cambio cancela el cálculo anterior.
+let worker=null,workerBroken=false,workerURL=null;
+function getWorker(){if(workerBroken||typeof Worker==='undefined')return null;try{if(worker)worker.terminate();
+  if(!workerURL){const src=document.getElementById('engine-src').textContent+'\nself.onmessage=e=>{const M=ENGINE.setup(e.data.D);self.postMessage(ENGINE.simulate(M,e.data.opt))};';workerURL=URL.createObjectURL(new Blob([src],{type:'text/javascript'}))}
+  worker=new Worker(workerURL);return worker}catch(err){workerBroken=true;return null}}
 function q(arr,p){const a=Array.from(arr).sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor(p*(a.length-1)))]}
 function renderAll(){renderKpis();renderBars();renderBlocs();renderErr();renderMap();renderDetail();renderTable()}
 function renderKpis(){const b=R.blocPV,N=R.N;const iC=P.indexOf('CC'),iS=P.indexOf('SALF'),iPS=P.indexOf('PSOE');
