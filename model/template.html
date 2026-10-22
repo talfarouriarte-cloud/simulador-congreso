@@ -229,8 +229,9 @@ const ENGINE=(function(){
 const BLOC_SD=0.022, IDIO_N=1500;
 function rngFactory(seed){let a=seed>>>0;const u=()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
   let spare=null;const n=()=>{if(spare!==null){const s=spare;spare=null;return s}let x,y,r;do{x=u()*2-1;y=u()*2-1;r=x*x+y*y}while(r>=1||r===0);const m=Math.sqrt(-2*Math.log(r)/r);spare=y*m;return x*m};return{u,n}}
-function dhondt(v,seats,valid,elig,out){const P=v.length;const w=new Float64Array(P);for(let i=0;i<P;i++)w[i]=(elig[i]&&v[i]>=0.03*valid)?v[i]:0;
-  const s=out||new Int32Array(P);s.fill(0);for(let k=0;k<seats;k++){let bi=0,bq=-1;for(let i=0;i<P;i++){const q=w[i]/(s[i]+1);if(q>bq||(q===bq&&w[i]>w[bi])){bq=q;bi=i}}s[bi]++}return s}
+const _W=new Float64Array(64),_S=new Int32Array(64),_V=new Float64Array(64);
+function dhondt(v,seats,valid,elig,out){const P=v.length;const w=_W;for(let i=0;i<P;i++)w[i]=(elig[i]&&v[i]>=0.03*valid)?v[i]:0;
+  const s=out||new Int32Array(P);for(let i=0;i<P;i++)s[i]=0;for(let k=0;k<seats;k++){let bi=0,bq=-1;for(let i=0;i<P;i++){const q=w[i]/(s[i]+1);if(q>bq||(q===bq&&w[i]>w[bi])){bq=q;bi=i}}s[bi]++}return s}
 function lastQuotients(v,seats,valid,elig){const P=v.length;const w=v.map((x,i)=>(elig[i]&&x>=0.03*valid)?x:0);const s=new Array(P).fill(0);const log=[];
   for(let k=0;k<seats+3;k++){let bi=0,bq=-1;for(let i=0;i<P;i++){const q=w[i]/(s[i]+1);if(q>bq){bq=q;bi=i}}if(bq<=0)break;log.push({seat:k+1,party:bi,q:bq,won:k<seats});s[bi]++}return log}
 function setup(D){const P=D.parties,K=D.provinces.length;const B=D.provinces.map(r=>P.map(p=>r[p]));const V=D.provinces.map(r=>r.valid);const S=D.provinces.map(r=>r.seats);
@@ -246,7 +247,7 @@ function provShares(M,th,noiseFn){const {P,K,B,V,Vt,baseNat}=M;const NP=P.length
   return x}
 function central(M,mu){const {K,V,S,elig}=M;const x=provShares(M,mu,null);const seats=[],votes=[];
   for(let k=0;k<K;k++){const v=Array.from(x[k],s=>s*V[k]);votes.push(v);seats.push(Array.from(dhondt(v,S[k],V[k],elig)))}return{shares:x,votes,seats}}
-function blocAfter(M,k,v,from,to,amt,iPP,iV){const w=v.slice();const m=Math.min(amt,w[from]);w[from]-=m;w[to]+=m;const s=dhondt(w,M.S[k],M.V[k],M.elig);return s[iPP]+s[iV]}
+function blocAfter(M,k,v,from,to,amt,iPP,iV){const P=v.length,w=_V.subarray(0,P);for(let i=0;i<P;i++)w[i]=v[i];const m=Math.min(amt,w[from]);w[from]-=m;w[to]+=m;const s=dhondt(w,M.S[k],M.V[k],M.elig,_S.subarray(0,P));return s[iPP]+s[iV]}
 function flipNeeded(M,k,v,from,to,iPP,iV){const s0=dhondt(v,M.S[k],M.V[k],M.elig);const b0=s0[iPP]+s0[iV];const step=M.V[k]*0.0005;const maxv=Math.min(v[from],M.V[k]*0.15);
   for(let a=step;a<=maxv+1e-9;a+=step){const b=blocAfter(M,k,v,from,to,a,iPP,iV);if(b!==b0){let lo=a-step,hi=a;for(let t=0;t<14;t++){const mid=(lo+hi)/2;if(blocAfter(M,k,v,from,to,mid,iPP,iV)!==b0)hi=mid;else lo=mid}return{votes:Math.ceil(hi),d:b-b0}}}return null}
 function simulate(M,opt){const {P,K,V,S,cc,ci,elig,isNew}=M;const NP=P.length;const N=opt.N,rng=rngFactory(opt.seed||7);
@@ -265,7 +266,8 @@ function simulate(M,opt){const {P,K,V,S,cc,ci,elig,isNew}=M;const NP=P.length;co
     {let r=0,l=0;for(let j=0;j<NP;j++){if(RIGHT[j])r+=th[j];else if(LEFT[j])l+=th[j]}voteR[n]=r;voteL[n]=l;voteO[n]=1-r-l}
     for(let i=0;i<regN.length;i++)regN[i]=rng.n();for(let i=0;i<prvN.length;i++)prvN[i]=rng.n();
     const x=provShares(M,th,(k,j)=>Math.exp(regN[ci[k]*NP+j]*sr[j]+prvN[k*NP+j]*sp[j]));
-    for(let k=0;k<K;k++){const v=new Array(NP);for(let j=0;j<NP;j++)v[j]=x[k][j]*V[k];
+    const v=new Float64Array(NP);
+    for(let k=0;k<K;k++){for(let j=0;j<NP;j++)v[j]=x[k][j]*V[k];
       const s0=dhondt(v,S[k],V[k],elig,tmp);for(let j=0;j<NP;j++){natSeats[j][n]+=s0[j];provSeatSum[k][j]+=s0[j]}
       const b0=s0[iPP]+s0[iV];if(s0[iV]===0){voxSeatsZero[k]++;voxWaste[k]+=v[iV]}
       const amt=delta*V[k];const b1=blocAfter(M,k,v,iV,iPP,amt,iPP,iV);const b2=blocAfter(M,k,v,iPP,iV,amt,iPP,iV);
@@ -316,13 +318,22 @@ function schedule(){clearTimeout(timer);$('status').textContent='Calculando…';
 function run(){const mu=muVec();C=ENGINE.central(M,mu);C.flip=D.provinces.map((r,k)=>({toPP:ENGINE.flipNeeded(M,k,C.votes[k],iV,iPP,iPP,iV),toVox:ENGINE.flipNeeded(M,k,C.votes[k],iPP,iV,iPP,iV)}));
   renderHemi();const opt={N:+$('nsim').value,mu,sd:sdVec(),unc:+$('unc').value/2.2,delta:+$('delta').value/100,seed:11};const t0=performance.now();
   const done=res=>{R=res;const dt=performance.now()-t0;$('status').textContent=`${R.N.toLocaleString('es-ES')} simulaciones · ${fmt(dt/1000,1)} s · encuestas hasta ${D.meta.poll_date}`;renderAll()};
-  const w=getWorker();if(w){w.onmessage=e=>done(e.data);w.onerror=()=>{workerBroken=true;worker=null;setTimeout(()=>done(ENGINE.simulate(M,opt)),20)};w.postMessage({D,opt})}
+  const ws=getWorkers(opt.N);if(ws){const k=ws.length,parts=new Array(k);let got=0;
+    ws.forEach((w,i)=>{const n=Math.floor(opt.N/k)+(i<opt.N%k?1:0);w.onmessage=e=>{parts[i]=e.data;if(++got===k)done(mergeRuns(parts))};
+      w.onerror=()=>{workerBroken=true;killWorkers();setTimeout(()=>done(ENGINE.simulate(M,opt)),20)};w.postMessage({D,opt:Object.assign({},opt,{N:n,seed:opt.seed+i*7919})})})}
   else setTimeout(()=>done(ENGINE.simulate(M,opt)),20)}
-// La simulación corre en un Web Worker para que la página no se bloquee; cada cambio cancela el cálculo anterior.
-let worker=null,workerBroken=false,workerURL=null;
-function getWorker(){if(workerBroken||typeof Worker==='undefined')return null;try{if(worker)worker.terminate();
+// La simulación se reparte entre varios Web Workers en paralelo; la página no se bloquea y cada cambio cancela el cálculo anterior.
+let workers=[],workerBroken=false,workerURL=null;
+function killWorkers(){workers.forEach(w=>w.terminate());workers=[]}
+function getWorkers(N){if(workerBroken||typeof Worker==='undefined')return null;try{killWorkers();
   if(!workerURL){const src=document.getElementById('engine-src').textContent+'\nself.onmessage=e=>{const M=ENGINE.setup(e.data.D);self.postMessage(ENGINE.simulate(M,e.data.opt))};';workerURL=URL.createObjectURL(new Blob([src],{type:'text/javascript'}))}
-  worker=new Worker(workerURL);return worker}catch(err){workerBroken=true;return null}}
+  const k=Math.max(1,Math.min(4,(navigator.hardwareConcurrency||2)-1,Math.ceil(N/500)));for(let i=0;i<k;i++)workers.push(new Worker(workerURL));return workers}catch(err){workerBroken=true;killWorkers();return null}}
+function mergeRuns(parts){const N=parts.reduce((a,p)=>a+p.N,0),cat=(get,T)=>{const out=new T(N);let o=0;for(const p of parts){const a=get(p);out.set(a,o);o+=a.length}return out};
+  const wavg=get=>{const L=get(parts[0]).length;const out=new Array(L).fill(0);for(const p of parts){const a=get(p);for(let i=0;i<L;i++)out[i]+=a[i]*p.N/N}return out};
+  return{N,RIGHT:parts[0].RIGHT,LEFT:parts[0].LEFT,natSeats:parts[0].natSeats.map((_,j)=>cat(p=>p.natSeats[j],Int32Array)),blocPV:cat(p=>p.blocPV,Int32Array),
+    voteR:cat(p=>p.voteR,Float64Array),voteL:cat(p=>p.voteL,Float64Array),voteO:cat(p=>p.voteO,Float64Array),
+    conc:wavg(p=>p.conc),concNeg:wavg(p=>p.concNeg),voxGain:wavg(p=>p.voxGain),voxZero:wavg(p=>p.voxZero),voxWasteVotes:wavg(p=>p.voxWasteVotes),
+    provSeatMean:parts[0].provSeatMean.map((_,k)=>wavg(p=>p.provSeatMean[k]))}}
 function q(arr,p){const a=Array.from(arr).sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor(p*(a.length-1)))]}
 function renderAll(){renderKpis();renderBars();renderBlocs();renderErr();renderMap();renderDetail();renderTable()}
 function renderKpis(){const b=R.blocPV,N=R.N;const iC=P.indexOf('CC'),iS=P.indexOf('SALF'),iPS=P.indexOf('PSOE');
