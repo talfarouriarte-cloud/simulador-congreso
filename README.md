@@ -9,7 +9,7 @@ Simulador de escaños del Congreso de los Diputados para las elecciones generale
 ## Qué hace
 
 - **Reparto D'Hondt** en las 52 circunscripciones, con el umbral del 3% sobre voto válido (incluye el voto en blanco) y los escaños del Real Decreto 806/2026: Madrid 38 y Cádiz 8.
-- **Simulación Monte Carlo** en el navegador (2.000 escenarios por defecto) con:
+- **Simulación Monte Carlo** en el navegador (6.000 escenarios por defecto) con:
   - un error común de bloque derecha/izquierda y un error propio de cada partido;
   - ruido regional y provincial;
   - swing proporcional desde el perfil territorial de 2023.
