@@ -150,7 +150,7 @@ tr.clk{cursor:pointer} tr.clk:hover td{background:var(--surface-2)}
           <p class="hint" style="margin:0" id="err-read"></p>
           <div class="btns"><button id="b-err43">A 43 días: 2,9 pts</button><button id="b-err14">Final de campaña: 2,2 pts</button></div>
         </div>
-        <div class="sl"><label for="delta">Trasvase</label><div class="track"><input id="delta" type="range" min="0.25" max="5" step="0.25" value="1"></div><output id="o-delta">1,0</output>
+        <div class="sl"><label for="delta">Trasvase</label><div class="track"><input id="delta" type="range" min="0.25" max="5" step="0.25" value="3"></div><output id="o-delta">3,0</output>
           <small>Puntos del voto de cada provincia que se mueven entre Vox y PP para medir el voto útil.</small></div>
         <div class="sl"><label for="nsim">Simul.</label><div class="track"><input id="nsim" type="range" min="500" max="6000" step="500" value="6000"></div><output id="o-nsim">6000</output></div>
       </div>
@@ -433,11 +433,11 @@ function renderDetail(){const k=state.sel,p=D.provinces[k];const s=C.seats[k];co
       <tr><td>Votos de PP a Vox para cambiar el bloque (central)</td><td class="num">${flipTxt(f.toVox)}</td></tr>
     </tbody></table></div>
   </div></div>`}
-const COLS=[['prov','Provincia'],['seats','Esc.'],['pp','PP'],['vox','Vox'],['bloc','PP+Vox'],['net','Ventaja Vox'],['conc','Concentrar suma'],['vg','A Vox suma'],['zero','Vox sin escaño'],['fpp','Votos Vox→PP'],['fvx','Votos PP→Vox'],['ver','Lectura']];
+const COLS=[['prov','Provincia'],['ver','Lectura'],['seats','Esc.'],['pp','PP'],['vox','Vox'],['bloc','PP+Vox'],['net','Ventaja Vox'],['conc','Concentrar suma'],['vg','A Vox suma'],['zero','Vox sin escaño'],['fpp','Votos Vox→PP'],['fvx','Votos PP→Vox']];
 function renderTable(){const rows=D.provinces.map((p,k)=>({k,prov:p.prov,seats:p.seats,pp:C.seats[k][iPP],vox:C.seats[k][iV],bloc:C.seats[k][iPP]+C.seats[k][iV],net:R.voxGain[k]-R.conc[k],conc:R.conc[k],vg:R.voxGain[k],zero:R.voxZero[k],
     fpp:C.flip[k].toPP?C.flip[k].toPP.votes:1e12,fvx:C.flip[k].toVox?C.flip[k].toVox.votes:1e12,ver:verdict(k)}));
   const {k:sk,dir}=state.sort;rows.sort((a,b)=>{const x=a[sk],y=b[sk];if(sk==='ver')return dir*(a.net-b.net);return typeof x==='string'?dir*x.localeCompare(y,'es'):dir*(x-y)});
-  $('tbl').innerHTML=`<thead><tr>${COLS.map(([c,l])=>`<th data-c="${c}">${l}${sk===c?(dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="clk" data-k="${r.k}"><td>${r.prov}</td><td class="num">${r.seats}</td><td class="num">${r.pp}</td><td class="num">${r.vox}</td><td class="num">${r.bloc}</td><td class="num">${(r.net>0?'+':'')+Math.round(r.net*100)}</td><td class="num">${pct(r.conc)}</td><td class="num">${pct(r.vg)}</td><td class="num">${pct(r.zero)}</td><td class="num">${flipTxt(C.flip[r.k].toPP)}</td><td class="num">${flipTxt(C.flip[r.k].toVox)}</td><td><span class="chip ${r.ver[1]}">${r.ver[0]}</span></td></tr>`).join('')}</tbody>`;
+  $('tbl').innerHTML=`<thead><tr>${COLS.map(([c,l])=>`<th data-c="${c}">${l}${sk===c?(dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="clk" data-k="${r.k}"><td>${r.prov}</td><td><span class="chip ${r.ver[1]}">${r.ver[0]}</span></td><td class="num">${r.seats}</td><td class="num">${r.pp}</td><td class="num">${r.vox}</td><td class="num">${r.bloc}</td><td class="num">${(r.net>0?'+':'')+Math.round(r.net*100)}</td><td class="num">${pct(r.conc)}</td><td class="num">${pct(r.vg)}</td><td class="num">${pct(r.zero)}</td><td class="num">${flipTxt(C.flip[r.k].toPP)}</td><td class="num">${flipTxt(C.flip[r.k].toVox)}</td></tr>`).join('')}</tbody>`;
   $('tbl').querySelectorAll('th').forEach(th=>th.onclick=()=>{const c=th.dataset.c;state.sort={k:c,dir:state.sort.k===c?-state.sort.dir:(c==='prov'?1:-1)};renderTable()});
   $('tbl').querySelectorAll('tr.clk').forEach(tr=>tr.onclick=()=>{state.sel=+tr.dataset.k;renderMap();renderDetail();($('detail-sect').open=true,$('detail-sect').scrollIntoView({behavior:'smooth',block:'nearest'}))})}
 // metodología
