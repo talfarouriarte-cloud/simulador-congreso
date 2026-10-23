@@ -2,7 +2,7 @@
 
 Simulador de escaños del Congreso de los Diputados para las elecciones generales del 29 de noviembre de 2026. Parte de una media bayesiana de encuestas y permite mover los supuestos para ver cómo cambia el reparto, nacional y por provincia, y dónde rinde más el voto a Vox o al PP para el bloque PP+Vox.
 
-**[Abrir el simulador](https://talfarouriarte-cloud.github.io/simulador-congreso/)**
+**[Abrir el simulador](https://votoutilderecha.github.io/)**
 
 ![Portada](docs/portada.png)
 
@@ -58,7 +58,7 @@ model/hist_*.py      error histórico de las encuestas
 Para regenerar la página:
 
 ```
-python3 model/build_base.py && python3 model/polls_model.py && SITE_URL=https://talfarouriarte-cloud.github.io/simulador-congreso/ python3 model/build_page.py
+python3 model/build_base.py && python3 model/polls_model.py && SITE_URL=https://votoutilderecha.github.io/ python3 model/build_page.py
 ```
 
 ## Fuentes
