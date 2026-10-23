@@ -116,7 +116,8 @@ tr.clk{cursor:pointer} tr.clk:hover td{background:var(--surface-2)}
 .info{position:static;flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--muted);color:var(--muted);font:700 11px/15px var(--f-mono);text-align:center;cursor:help}
 .info:hover,.info:focus{border-color:var(--accent);color:var(--accent);outline:none}
 .info .tip{display:none;position:absolute;left:16px;right:16px;top:calc(100% - 4px);z-index:20;max-width:460px;padding:10px 12px;border-radius:6px;background:var(--ink);color:var(--bg);font:400 13px/1.45 var(--f-body);text-align:left;box-shadow:0 6px 20px rgb(0 0 0 / .18)}
-.info:hover .tip,.info:focus .tip,.info:focus-within .tip{display:block}
+.info.open .tip{display:block}
+@media (hover:hover){.info:hover .tip{display:block}}
 .row2>.sect{align-self:start}
 .info.inline .tip{left:0;right:0;top:24px}
 
@@ -484,7 +485,10 @@ $('method').innerHTML=`<h2>Cómo está hecho</h2>
 <p><b>Lo que el modelo no hace.</b> No modela efectos de casa por empresa, cambios de participación ni transferencias de voto distintas por provincia. Tampoco distingue errores por territorio: si las encuestas fallan más en una comunidad que en otra, solo lo recoge el ruido regional.</p>
 
 <p class="hint">Fuentes: Wikipedia, «Results breakdown of the 2023 Spanish general election (Congress)», páginas de cada circunscripción, «Results breakdown of the 2024 European Parliament election in Spain» y «Opinion polling for the next Spanish general election», y BOE-A-2026-20742 (Real Decreto 806/2026), consultados el ${D.meta.built}.</p>`;
-document.querySelectorAll('.info').forEach(el=>{el.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();el.focus()});el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation()}})});
+const infos=[...document.querySelectorAll('.info')];const toggleInfo=el=>{const o=!el.classList.contains('open');infos.forEach(x=>{x.classList.remove('open');x.setAttribute('aria-expanded','false')});if(o){el.classList.add('open');el.setAttribute('aria-expanded','true')}};
+infos.forEach(el=>{el.setAttribute('aria-expanded','false');el.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();toggleInfo(el)});el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();toggleInfo(el)}})});
+document.addEventListener('click',e=>{if(!e.target.closest('.info'))infos.forEach(x=>{x.classList.remove('open');x.setAttribute('aria-expanded','false')})});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')infos.forEach(x=>{x.classList.remove('open');x.setAttribute('aria-expanded','false')})});
 syncOut();run();
 })();
 </script>
