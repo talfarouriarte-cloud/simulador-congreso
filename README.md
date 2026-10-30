@@ -15,6 +15,7 @@ Simulador de escaños del Congreso de los Diputados para las elecciones generale
   - swing proporcional desde el perfil territorial de 2023.
 - **Voto útil:** en cada provincia, la probabilidad de que mover voto de Vox a PP, o de PP a Vox, haga ganar un escaño al bloque PP+Vox, y cuántos votos hacen falta en el escenario central.
 - **Bloques:** distribución de escaños y de voto para derecha, izquierda y otros.
+- **Evolución semanal:** la previsión recalculada cada domingo desde enero de 2026 (probabilidades, escaños y voto por partido y por bloque), con el error histórico correspondiente a los días que faltaban para votar.
 
 ## Validación
 
@@ -27,7 +28,7 @@ Simulador de escaños del Congreso de los Diputados para las elecciones generale
 |---|---|
 | Base 2023 | Resultados definitivos por circunscripción (Wikipedia, páginas de cada circunscripción) |
 | Podemos y SALF | Perfil por comunidad de las europeas de 2024 |
-| Encuestas | 17 encuestas publicadas del 7 de septiembre al 17 de octubre de 2026, la última de cada empresa, ponderadas por muestra y antigüedad (vida media de 21 días); prior centrado en el 23-J |
+| Encuestas | Encuestas publicadas en los 45 días anteriores, la última de cada empresa, ponderadas por muestra y antigüedad (vida media de 21 días); prior centrado en el 23-J. Se excluyen las encargadas por partidos |
 | Error del día de la elección | Calibrado con 2016, abril 2019, noviembre 2019 y 2023: unos 2,2 pts de error de bloque al final de la campaña y unos 2,9 pts a 43 días (`model/hist_horizon.py`) |
 | Candidaturas 29-N | Podemos apoya a ERC en Cataluña; Compromís-Front Valencià (con Podemos y EUPV); Unidad del Pueblo Canario (FA, Podemos y NC-BC); UPN en coalición con el PP; Aliança Catalana no se presenta; Coalición Existe en Aragón |
 
@@ -53,12 +54,15 @@ model/build_base.py  cuotas base por provincia y ajustes por candidaturas
 model/build_page.py  genera index.html a partir de model/template.html
 model/validate.py    validación contra 2023
 model/hist_*.py      error histórico de las encuestas
+model/timeseries.py  serie semanal (usa model/ts_sim.js, el mismo motor de la página)
 ```
 
 Para regenerar la página:
 
 ```
-python3 model/build_base.py && python3 model/polls_model.py && SITE_URL=https://votoutilderecha.github.io/ python3 model/build_page.py
+python3 model/polls_parse.py raw/polls.html data/polls_2026.csv   # raw/polls.html: página de encuestas de Wikipedia
+python3 model/build_base.py && python3 model/polls_model.py && python3 model/timeseries.py
+SITE_URL=https://votoutilderecha.github.io/ python3 model/build_page.py
 ```
 
 ## Fuentes
@@ -69,4 +73,4 @@ python3 model/build_base.py && python3 model/polls_model.py && SITE_URL=https://
 - BOE-A-2026-20742, Real Decreto 806/2026 de convocatoria
 - Prensa sobre las candidaturas: Infobae, Mundiario, El Plural
 
-Herramienta de análisis, no es un pronóstico oficial. Datos consultados el 22 de octubre de 2026.
+Herramienta de análisis, no es un pronóstico oficial. Encuestas actualizadas a 25 de octubre de 2026.

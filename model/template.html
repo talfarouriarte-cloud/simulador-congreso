@@ -146,12 +146,12 @@ tr.clk{cursor:pointer} tr.clk:hover td{background:var(--surface-2)}
       <div class="stack" style="gap:10px">
         <h3>Incertidumbre y medida del voto útil</h3>
         <div class="sl"><label for="unc">Error</label><div class="track"><input id="unc" type="range" min="0" max="6" step="0.1" value="2.9"></div><output id="o-unc">2,9 pts</output>
-          <small>Error típico de las encuestas en el voto del bloque PP+Vox, en puntos. Por defecto, el histórico a 43 días de la elección.</small></div>
+          <small id="unc-hint">Error típico de las encuestas en el voto del bloque PP+Vox, en puntos.</small></div>
         <div class="stack" style="gap:6px">
           <div style="display:flex;align-items:center;gap:8px;position:relative"><span class="eyebrow">Error histórico según días hasta votar</span><span class="info inline" tabindex="0" role="button" aria-label="Qué muestra este gráfico">i<span class="tip" role="tooltip">Cuánto se equivocó la media de encuestas en el voto de cada bloque según los días que faltaban para votar, en las generales de 2016, abril 2019, noviembre 2019 y 2023. Es la desviación típica del error, en puntos. Azul: bloque derecha. Rojo: bloque izquierda. La línea discontinua es el error que usas y la vertical, la fecha de las encuestas actuales. El error baja hasta unas dos semanas antes de votar y luego se estanca en unos 2 pts: ese suelo es sesgo de las encuestas, no falta de datos. Con solo cuatro elecciones, la curva es orientativa.</span></span></div>
           <svg id="errcurve" viewBox="0 0 320 170" role="img" aria-label="Error de las encuestas según los días hasta la elección" style="width:100%;height:auto"></svg>
           <p class="hint" style="margin:0" id="err-read"></p>
-          <div class="btns"><button id="b-err43">A 43 días: 2,9 pts</button><button id="b-err14">Final de campaña: 2,2 pts</button></div>
+          <div class="btns"><button id="b-err43">Histórico a hoy</button><button id="b-err14">Final de campaña: 2,2 pts</button></div>
         </div>
         <div class="sl"><label for="delta">Trasvase</label><div class="track"><input id="delta" type="range" min="0.25" max="5" step="0.25" value="3"></div><output id="o-delta">3,0</output>
           <small>Puntos del voto de cada provincia que se mueven entre Vox y PP para medir el voto útil.</small></div>
@@ -168,6 +168,22 @@ tr.clk{cursor:pointer} tr.clk:hover td{background:var(--surface-2)}
         </div>
       </details>
       <section class="kpis" id="kpis"></section>
+
+      <details class="panel sect" id="evo-sect">
+        <summary><h2>Evolución semanal</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Cómo ha cambiado la previsión desde enero, recalculada cada domingo con las encuestas disponibles esa semana y el mismo modelo nacional. El error de cada semana es el histórico según los días que faltaban para el 29-N (más de 90 días: el de 90), así que parte del cambio en las probabilidades viene de que se acerca la fecha y no de las encuestas. No usa tus supuestos del panel lateral.</span></span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="stack">
+          <div class="btns" role="tablist" aria-label="Qué ver">
+            <button data-evo="prob" class="primary">Probabilidades</button>
+            <button data-evo="bseats">Escaños por bloque</button>
+            <button data-evo="pseats">Escaños por partido</button>
+            <button data-evo="bvote">Voto por bloque</button>
+            <button data-evo="pvote">Voto por partido</button>
+          </div>
+          <svg id="evo" viewBox="0 0 680 300" role="img" aria-label="Evolución semanal" style="width:100%;height:auto;touch-action:pan-y"></svg>
+          <div class="legend" id="evo-leg"></div>
+          <p class="hint" style="margin:0" id="evo-read"></p>
+        </div>
+      </details>
 
       <details class="panel sect">
         <summary><h2>Escaños por partido</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Resultado de todas las simulaciones. La marca es la mediana de escaños y la barra clara, el intervalo donde caen el 90% de los casos. Una barra ancha indica que el partido está cerca de ganar o perder escaños en varias provincias.</span></span><span class="chev" aria-hidden="true"></span></summary>
@@ -309,7 +325,8 @@ for(const p of P){if(p==='Otros')continue;const max=SLMAX[p]||12;const id='s-'+p
   sw.appendChild(d);d.querySelector('input').addEventListener('input',e=>{state.mu[p]=+e.target.value;syncOut();schedule()})}
 function syncOut(){let s=0;for(const p of P){if(p==='Otros')continue;s+=state.mu[p];const id='s-'+p.replace(/\W/g,'');$(id).value=state.mu[p];$('o-'+id).textContent=fmt(state.mu[p])}
   const o=100-s;$('o-otros').textContent=fmt(o);$('o-otros').style.color=o<0.5?'var(--warn)':''}
-$('b-err43').onclick=()=>{$('unc').value=2.9;$('o-unc').textContent='2,9 pts';schedule()};$('b-err14').onclick=()=>{$('unc').value=2.2;$('o-unc').textContent='2,2 pts';schedule()};
+const ERR0=D.meta.err_default;$('unc').value=ERR0;$('o-unc').textContent=fmt(ERR0)+' pts';$('b-err43').textContent=`A ${D.meta.poll_days} días: ${fmt(ERR0)} pts`;$('unc-hint').textContent=`Error típico de las encuestas en el voto del bloque PP+Vox, en puntos. Por defecto, el histórico a ${D.meta.poll_days} días de la elección, la distancia de las últimas encuestas.`;
+$('b-err43').onclick=()=>{$('unc').value=ERR0;$('o-unc').textContent=fmt(ERR0)+' pts';schedule()};$('b-err14').onclick=()=>{$('unc').value=2.2;$('o-unc').textContent='2,2 pts';schedule()};
 $('b-reset').onclick=()=>{state.mu=Object.assign({},pollMean);syncOut();schedule()};
 document.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{const [a,c,x]=b.dataset.move.split(',');const m=Math.min(+x,state.mu[a]);state.mu[a]=+(state.mu[a]-m).toFixed(1);state.mu[c]=+(state.mu[c]+m).toFixed(1);syncOut();schedule()});
 $('unc').addEventListener('input',()=>{if(R)renderErr()});
@@ -363,7 +380,7 @@ function renderBlocs(){const N=R.N;const seats={R:new Int32Array(N),L:new Int32A
    BLOCS.map(b=>{const sv=seats[b.k],vv=vote[b.k];let m=0;for(let n=0;n<N;n++)if(sv[n]>=176)m++;
     return `<tr><td><span class="sw" style="background:${b.col};display:inline-block;margin-right:6px"></span>${b.name}</td><td class="num">${fmt(q(vv,.5)*100)}%</td><td class="num">${fmt(q(vv,.05)*100)}–${fmt(q(vv,.95)*100)}</td><td class="num">${cseat(b.k)}</td><td class="num">${q(sv,.5)}</td><td class="num">${q(sv,.05)}–${q(sv,.95)}</td><td class="num">${pct(m/N)}</td></tr>`}).join('')+'</tbody>'}
 
-const HZ=[{h:3,r:2.19,l:1.70},{h:7,r:2.25,l:1.88},{h:14,r:2.23,l:1.80},{h:21,r:2.31,l:2.14},{h:30,r:2.90,l:2.81},{h:45,r:2.88,l:4.28},{h:60,r:4.03,l:2.54},{h:90,r:4.80,l:6.97}];const POLL_DAYS=43;
+const HZ=[{h:3,r:2.19,l:1.70},{h:7,r:2.25,l:1.88},{h:14,r:2.23,l:1.80},{h:21,r:2.31,l:2.14},{h:30,r:2.90,l:2.81},{h:45,r:2.88,l:4.28},{h:60,r:4.03,l:2.54},{h:90,r:4.80,l:6.97}];const POLL_DAYS=D.meta.poll_days;
 function renderErr(){const W=320,Hh=170,ml=24,mr=6,mt=14,mb=30;const xmax=95,ymax=7.5;const x=d=>ml+(xmax-d)/xmax*(W-ml-mr),y=v=>Hh-mb-v/ymax*(Hh-mt-mb);let s='';
   for(let v=0;v<=7;v+=1){if(v%2)continue;s+=`<line x1="${ml}" y1="${y(v)}" x2="${W-mr}" y2="${y(v)}" stroke="var(--line)"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end" style="font:10px var(--f-mono);fill:var(--muted)">${v}</text>`}
   for(const d of [90,60,30,14,0]){s+=`<text x="${x(d)}" y="${Hh-mb+16}" text-anchor="middle" style="font:10px var(--f-mono);fill:var(--muted)">${d}</text>`}
@@ -373,6 +390,40 @@ function renderErr(){const W=320,Hh=170,ml=24,mr=6,mt=14,mb=30;const xmax=95,yma
   s+=`<line x1="${x(POLL_DAYS)}" y1="${mt}" x2="${x(POLL_DAYS)}" y2="${Hh-mb}" stroke="var(--accent)" stroke-width="1.5"/><text x="${x(POLL_DAYS)+4}" y="${mt+4}" style="font:600 10px var(--f-mono);fill:var(--accent)">hoy (${POLL_DAYS} d)</text>`;
   s+=`<line x1="${ml}" y1="${Hh-mb}" x2="${W-mr}" y2="${Hh-mb}" stroke="var(--muted)"/>`;$('errcurve').innerHTML=s;
   $('err-read').textContent=`Con ${fmt(u)} pts, el voto de PP+Vox caería en el 90% de los casos a unos ±${fmt(1.645*u)} pts de tus supuestos.`}
+
+// --- evolución semanal ---
+const TS=D.ts?D.ts.weeks:[];const evo={view:'prob',hover:null,hidden:new Set(['SALF','Existe','AA','CC','BNG','PNV','EH Bildu','Junts','FV','Podemos'])};
+const BCOL={R:'var(--pp)',L:'#e2231a',O:'#9a7b4f'},BNAME={R:'Derecha',L:'Izquierda',O:'Otros'};
+function evoSeries(){const v=evo.view;
+  if(v==='prob')return{y:[0,1],fmt:x=>pct(x),ref:null,ser:[{k:'p1',name:'P(PP+Vox ≥ 176)',col:'var(--pp)',vals:TS.map(w=>w.p_ppvox)},{k:'p2',name:'P(PP > PSOE en escaños)',col:'#7a7f86',vals:TS.map(w=>w.p_pp_gt_psoe)}]};
+  if(v==='bseats')return{ref:176,fmt:x=>Math.round(x),ser:['R','L','O'].map(k=>({k,name:BNAME[k],col:BCOL[k],vals:TS.map(w=>w.blocs[k].med),lo:TS.map(w=>w.blocs[k].lo),hi:TS.map(w=>w.blocs[k].hi)}))};
+  if(v==='bvote')return{ref:null,fmt:x=>fmt(x)+'%',ser:['R','L','O'].map(k=>({k,name:BNAME[k],col:BCOL[k],vals:TS.map(w=>w.blocs[k].vote)}))};
+  const key=v==='pseats'?'med':'vote';const ps=P.filter(p=>p!=='Otros'&&TS.length&&TS[TS.length-1].parties[p]);
+  return{ref:null,fmt:v==='pseats'?(x=>Math.round(x)):(x=>fmt(x)+'%'),toggle:true,ser:ps.map(p=>({k:p,name:SHORT[p]||p,col:COL[p],vals:TS.map(w=>w.parties[p]?w.parties[p][key]:null),off:evo.hidden.has(p)}))}}
+function renderEvo(){if(!TS.length){$('evo').innerHTML='';return}const S=evoSeries();const cw=$('evo').getBoundingClientRect().width||680;const W=Math.round(Math.max(340,Math.min(680,cw))),H=W<500?260:300,ml=W<500?34:40,mr=10,mt=14,mb=30;$('evo').setAttribute('viewBox',`0 0 ${W} ${H}`);const n=TS.length;
+  const vis=S.ser.filter(s=>!s.off);let lo=S.y?S.y[0]:Infinity,hi=S.y?S.y[1]:-Infinity;
+  if(!S.y){vis.forEach(s=>s.vals.forEach((x,i)=>{if(x==null)return;lo=Math.min(lo,s.lo?s.lo[i]:x);hi=Math.max(hi,s.hi?s.hi[i]:x)}));if(S.ref){lo=Math.min(lo,S.ref);hi=Math.max(hi,S.ref)}const pad=(hi-lo)*0.08||1;lo=Math.max(0,lo-pad);hi=hi+pad}
+  const x=i=>ml+(n<2?0:i/(n-1))*(W-ml-mr),y=v=>H-mb-(v-lo)/(hi-lo)*(H-mt-mb);let s='';
+  const step=(hi-lo)/5;const mag=Math.pow(10,Math.floor(Math.log10(step)));const tick=[1,2,2.5,5,10].map(k=>k*mag).find(k=>k>=step)||step;
+  for(let v=Math.ceil(lo/tick)*tick;v<=hi+1e-9;v+=tick){s+=`<line x1="${ml}" y1="${y(v)}" x2="${W-mr}" y2="${y(v)}" stroke="var(--line)"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end" style="font:10px var(--f-mono);fill:var(--muted)">${S.fmt(v)}</text>`}
+  const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];let lastM=-1;
+  TS.forEach((w,i)=>{const d=new Date(w.date+'T12:00');if(d.getMonth()!==lastM){lastM=d.getMonth();s+=`<text x="${x(i)}" y="${H-mb+16}" text-anchor="middle" style="font:10px var(--f-mono);fill:var(--muted)">${MES[lastM]}</text>`}});
+  if(S.ref)s+=`<line x1="${ml}" y1="${y(S.ref)}" x2="${W-mr}" y2="${y(S.ref)}" stroke="var(--ink)" stroke-dasharray="4 3" stroke-width="1.2"/><text x="${W-mr}" y="${y(S.ref)-4}" text-anchor="end" style="font:600 10px var(--f-mono)">${S.ref}</text>`;
+  vis.forEach(se=>{if(se.lo){let d='';se.hi.forEach((v,i)=>d+=(i?'L':'M')+x(i)+','+y(v));for(let i=n-1;i>=0;i--)d+='L'+x(i)+','+y(se.lo[i]);s+=`<path d="${d}Z" fill="${se.col}" fill-opacity="0.13" stroke="none"/>`}
+    let d='',on=false;se.vals.forEach((v,i)=>{if(v==null){on=false;return}d+=(on?'L':'M')+x(i)+','+y(v);on=true});s+=`<path d="${d}" fill="none" stroke="${se.col}" stroke-width="2.2"/>`;
+    const li=se.vals.length-1;if(se.vals[li]!=null)s+=`<circle cx="${x(li)}" cy="${y(se.vals[li])}" r="3.5" fill="${se.col}"/>`});
+  const hi_=evo.hover==null?n-1:evo.hover;s+=`<line x1="${x(hi_)}" y1="${mt}" x2="${x(hi_)}" y2="${H-mb}" stroke="var(--muted)" stroke-width="1"/>`;
+  s+=`<rect x="${ml}" y="${mt}" width="${W-ml-mr}" height="${H-mt-mb}" fill="transparent" id="evo-hit"/>`;
+  $('evo').innerHTML=s;
+  const w=TS[hi_];const d=new Date(w.date+'T12:00');const fd=d.toLocaleDateString('es-ES',{day:'numeric',month:'long'});
+  $('evo-read').innerHTML=`<b>Semana del ${fd}</b> · ${w.n_polls} encuestas · error ${fmt(w.err)} pts (${w.days} días para votar)`;
+  $('evo-leg').innerHTML=S.ser.map(se=>{const v=se.vals[hi_];const lab=v==null?'–':S.fmt(v)+(se.lo?` <span class="muted">(${S.fmt(se.lo[hi_])}–${S.fmt(se.hi[hi_])})</span>`:'');
+    return `<span${S.toggle?` data-p="${se.k}" role="button" tabindex="0" style="cursor:pointer;${se.off?'opacity:.4':''}"`:''}><span class="sw" style="background:${se.col};display:inline-block;margin-right:4px"></span>${se.name} <b class="mono">${lab}</b></span>`}).join('')+(S.toggle?'<span class="muted">Pulsa un partido para mostrarlo u ocultarlo.</span>':'');
+  if(S.toggle)$('evo-leg').querySelectorAll('[data-p]').forEach(el=>{const f=()=>{const p=el.dataset.p;evo.hidden.has(p)?evo.hidden.delete(p):evo.hidden.add(p);renderEvo()};el.onclick=f;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();f()}}});
+  const hit=$('evo-hit');const pick=ev=>{const r=$('evo').getBoundingClientRect();const cx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;const px=cx/r.width*W;const i=Math.round((px-ml)/(W-ml-mr)*(n-1));const k=Math.max(0,Math.min(n-1,i));if(k!==evo.hover){evo.hover=k;renderEvo()}};
+  hit.addEventListener('mousemove',pick);hit.addEventListener('touchstart',pick,{passive:true});hit.addEventListener('touchmove',pick,{passive:true});
+  $('evo').onmouseleave=()=>{if(evo.hover!=null){evo.hover=null;renderEvo()}}}
+document.querySelectorAll('[data-evo]').forEach(b=>b.onclick=()=>{evo.view=b.dataset.evo;evo.hover=null;document.querySelectorAll('[data-evo]').forEach(x=>x.classList.toggle('primary',x===b));renderEvo()});
 function renderBars(){const rows=P.map((p,j)=>({p,j,med:q(R.natSeats[j],.5),lo:q(R.natSeats[j],.05),hi:q(R.natSeats[j],.95),c:C.seats.reduce((a,s)=>a+s[j],0)})).filter(r=>r.p!=='Otros').sort((a,b)=>b.med-a.med||b.hi-a.hi||pollMean[b.p]-pollMean[a.p]);
   const mx=Math.max(...rows.map(r=>r.hi),10);
   $('bars').innerHTML=rows.map(r=>`<div class="bar"><span><span class="sw" style="background:${COL[r.p]};display:inline-block;margin-right:5px"></span>${SHORT[r.p]||r.p}</span><div class="t"><i style="left:${r.lo/mx*100}%;width:${Math.max((r.hi-r.lo)/mx*100,.6)}%;background:${COL[r.p]}"></i><em style="left:calc(${r.med/mx*100}% - 1.5px);background:${COL[r.p]}"></em></div><span class="v">${r.med} <span class="muted">${r.lo}–${r.hi}</span></span></div>`).join('')}
@@ -457,7 +508,7 @@ $('method').innerHTML=`<h2>Cómo está hecho</h2>
 <tr><td>Abril 2019</td><td class="num">+3,5</td><td class="num">−0,7</td></tr>
 <tr><td>Noviembre 2019</td><td class="num">+0,4</td><td class="num">0,0</td></tr>
 <tr><td>2023</td><td class="num">+1,7</td><td class="num">−2,5</td></tr></tbody></table></div>
-<p>Puntos de encuesta menos resultado. Derecha: PP, Vox y Cs. Izquierda: PSOE y el espacio Podemos/Sumar/Más País. El modelo sortea un error común de bloque (lo que suma a un lado lo resta al otro) más un error propio de cada partido. El control «Error» fija la desviación del error de bloque en puntos; por defecto, 2,9 pts, el error histórico a 43 días de la elección, que es la distancia de las encuestas actuales. A final de campaña el histórico es de 2,2 pts. Con solo cuatro elecciones, esta calibración es orientativa.</p>
+<p>Puntos de encuesta menos resultado. Derecha: PP, Vox y Cs. Izquierda: PSOE y el espacio Podemos/Sumar/Más País. El modelo sortea un error común de bloque (lo que suma a un lado lo resta al otro) más un error propio de cada partido. El control «Error» fija la desviación del error de bloque en puntos; por defecto, ${fmt(D.meta.err_default)} pts, el error histórico a ${D.meta.poll_days} días de la elección, que es la distancia de las últimas encuestas. A final de campaña el histórico es de 2,2 pts.</p>
 <p><b>De lo nacional a lo provincial.</b> Swing proporcional: cada partido mantiene su perfil territorial de 2023 y se reescala hasta cuadrar con el voto nacional elegido (ajuste iterativo). Cada simulación añade ruido regional y provincial (~6% relativo cada uno, el doble en partidos nuevos), porque el voto no se mueve igual en todas partes. La participación por provincia se fija en la de 2023. Los escaños por provincia son los del Real Decreto 806/2026 de convocatoria: Madrid pasa de 37 a 38 y Cádiz de 9 a 8.</p>
 <p><b>Candidaturas del 29-N.</b> Las listas siguen los acuerdos cerrados para estas elecciones:</p>
 <ul>
@@ -483,6 +534,7 @@ const infos=[...document.querySelectorAll('.info')];const toggleInfo=el=>{const 
 infos.forEach(el=>{el.setAttribute('aria-expanded','false');el.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();toggleInfo(el)});el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();toggleInfo(el)}})});
 document.addEventListener('click',e=>{if(!e.target.closest('.info'))infos.forEach(x=>{x.classList.remove('open');x.setAttribute('aria-expanded','false')})});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')infos.forEach(x=>{x.classList.remove('open');x.setAttribute('aria-expanded','false')})});
+renderEvo();let evoRz=null;window.addEventListener('resize',()=>{clearTimeout(evoRz);evoRz=setTimeout(renderEvo,150)});$('evo-sect').addEventListener('toggle',renderEvo);
 syncOut();run();
 })();
 </script>

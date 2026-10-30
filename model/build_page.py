@@ -3,20 +3,19 @@ ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW=os.path.join(ROOT,"raw")+"/"
 import json
 b=json.load(open(os.path.join(ROOT,'data','base.json'))); p=json.load(open(os.path.join(ROOT,'data','polls_post.json')))
-po=p['post']
-m={k:dict(mean=v['mean'],sd=v['sd']) for k,v in po.items() if k not in('SUMESP','FVobs','AC','UPN')}
-m['FV']=dict(mean=po['FVobs']['mean'],sd=po['FVobs']['sd'])
-m['FA']=dict(mean=po['SUMESP']['mean']-po['FVobs']['mean']+b['nc_nat']*100,sd=po['SUMESP']['sd'])
-m['PP']['mean']+=po['UPN']['mean']
-src={k:m[k]['mean'] for k in m}
-for t in b['transfers']:
-    x=src[t['from']]*t['frac']; m[t['from']]['mean']-=x
-    if t['to'] in m: m[t['to']]['mean']+=x
-m['Existe']=dict(mean=b['base_nat']['Existe']*100,sd=0.03)
-for k in m: m[k]['mean']=round(m[k]['mean'],2)
+import sys, pandas as pd, numpy as np
+sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
+from polls_model import means
+m=means(p['post'],b)
+MESES='enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre'.split()
+fes=lambda d:f"{d.day} de {MESES[d.month-1]} de {d.year}"
+last=pd.Timestamp(p['last_poll']); asof=pd.Timestamp(p['date']); days=int((pd.Timestamp('2026-11-29')-last).days)
+HZ=[(3,2.19),(7,2.25),(14,2.23),(21,2.31),(30,2.90),(45,2.88),(60,4.03),(90,4.80)]
+err=round(float(np.interp(min(days,90),[h for h,_ in HZ],[e for _,e in HZ])),1)
+tsf=os.path.join(ROOT,'data','timeseries.json'); ts=json.load(open(tsf)) if os.path.exists(tsf) else None
 print({k:v['mean'] for k,v in m.items()})
 D={'means':m,'parties':b['parties'],'provinces':b['provinces'],'assumptions':b['assumptions'],'post':p['post'],
-   'meta':{'poll_date':'17 de octubre de 2026','window_from':'7 de septiembre de 2026','half_life':p['half_life'],'n_polls':p['n_polls'],'firms':p['firms'],'built':'22 de octubre de 2026'}}
+   'meta':{'poll_date':fes(last),'window_from':fes(asof-pd.Timedelta(days=p['window_days'])),'half_life':p['half_life'],'n_polls':p['n_polls'],'firms':p['firms'],'built':fes(pd.Timestamp.now()),'poll_days':days,'err_default':err},'ts':ts}
 s=open(os.path.join(ROOT,'model','template.html')).read().replace('__DATA__',json.dumps(D,ensure_ascii=False).replace('</','<\\/'))
 HEAD='''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
