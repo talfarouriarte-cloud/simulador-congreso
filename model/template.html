@@ -170,7 +170,7 @@ tr.clk{cursor:pointer} tr.clk:hover td{background:var(--surface-2)}
       <section class="kpis" id="kpis"></section>
 
       <details class="panel sect" id="evo-sect">
-        <summary><h2>Evolución semanal</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Cómo ha cambiado la previsión desde enero, recalculada cada domingo con las encuestas disponibles esa semana y el mismo modelo nacional. El error de cada semana es el histórico según los días que faltaban para el 29-N (más de 90 días: el de 90), así que parte del cambio en las probabilidades viene de que se acerca la fecha y no de las encuestas. No usa tus supuestos del panel lateral.</span></span><span class="chev" aria-hidden="true"></span></summary>
+        <summary><h2>Evolución semanal</h2><span class="info" tabindex="0" role="button" aria-label="Qué muestra esta sección">i<span class="tip" role="tooltip">Cómo ha cambiado la previsión desde enero, recalculada cada domingo con las encuestas disponibles esa semana y el mismo modelo nacional. El error de cada semana es el histórico según los días que faltaban para el 29-N (más de 90 días: el de 90), así que parte del cambio en las probabilidades viene de que se acerca la fecha y no de las encuestas. No usa tus supuestos del panel lateral. En las vistas de voto, cada punto es una encuesta publicada, con los mismos ajustes de candidaturas que la media (UPN con el PP, Podemos dentro de ERC o Compromís donde va con ellos, etc.).</span></span><span class="chev" aria-hidden="true"></span></summary>
         <div class="stack">
           <div class="btns" role="tablist" aria-label="Qué ver">
             <button data-evo="prob" class="primary">Probabilidades</button>
@@ -402,13 +402,16 @@ function evoSeries(){const v=evo.view;
   return{ref:null,fmt:v==='pseats'?(x=>Math.round(x)):(x=>fmt(x)+'%'),toggle:true,ser:ps.map(p=>({k:p,name:SHORT[p]||p,col:COL[p],vals:TS.map(w=>w.parties[p]?w.parties[p][key]:null),off:evo.hidden.has(p)}))}}
 function renderEvo(){if(!TS.length){$('evo').innerHTML='';return}const S=evoSeries();const cw=$('evo').getBoundingClientRect().width||680;const W=Math.round(Math.max(340,Math.min(680,cw))),H=W<500?260:300,ml=W<500?34:40,mr=10,mt=14,mb=30;$('evo').setAttribute('viewBox',`0 0 ${W} ${H}`);const n=TS.length;
   const vis=S.ser.filter(s=>!s.off);let lo=S.y?S.y[0]:Infinity,hi=S.y?S.y[1]:-Infinity;
-  if(!S.y){vis.forEach(s=>s.vals.forEach((x,i)=>{if(x==null)return;lo=Math.min(lo,s.lo?s.lo[i]:x);hi=Math.max(hi,s.hi?s.hi[i]:x)}));if(S.ref){lo=Math.min(lo,S.ref);hi=Math.max(hi,S.ref)}const pad=(hi-lo)*0.08||1;lo=Math.max(0,lo-pad);hi=hi+pad}
+  const PTS=(D.pts||[]);const dotKey=evo.view==='pvote'?'v':evo.view==='bvote'?'b':null;const t0=TS.length?new Date(TS[0].date+'T12:00').getTime():0;
+  const dots=[];if(dotKey)vis.forEach(se=>PTS.forEach(p=>{const val=p[dotKey][se.k];if(val==null)return;const fi=Math.max(0,Math.min(n-1,(new Date(p.d+'T12:00').getTime()-t0)/6048e5));dots.push({fi,val,col:se.col,f:p.f,d:p.d,name:se.name})}));
+  if(!S.y){vis.forEach(s=>s.vals.forEach((x,i)=>{if(x==null)return;lo=Math.min(lo,s.lo?s.lo[i]:x);hi=Math.max(hi,s.hi?s.hi[i]:x)}));dots.forEach(p=>{lo=Math.min(lo,p.val);hi=Math.max(hi,p.val)});if(S.ref){lo=Math.min(lo,S.ref);hi=Math.max(hi,S.ref)}const pad=(hi-lo)*0.08||1;lo=Math.max(0,lo-pad);hi=hi+pad}
   const x=i=>ml+(n<2?0:i/(n-1))*(W-ml-mr),y=v=>H-mb-(v-lo)/(hi-lo)*(H-mt-mb);let s='';
   const step=(hi-lo)/5;const mag=Math.pow(10,Math.floor(Math.log10(step)));const tick=[1,2,2.5,5,10].map(k=>k*mag).find(k=>k>=step)||step;
   for(let v=Math.ceil(lo/tick)*tick;v<=hi+1e-9;v+=tick){s+=`<line x1="${ml}" y1="${y(v)}" x2="${W-mr}" y2="${y(v)}" stroke="var(--line)"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end" style="font:10px var(--f-mono);fill:var(--muted)">${S.fmt(v)}</text>`}
   const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];let lastM=-1;
   TS.forEach((w,i)=>{const d=new Date(w.date+'T12:00');if(d.getMonth()!==lastM){lastM=d.getMonth();s+=`<text x="${x(i)}" y="${H-mb+16}" text-anchor="middle" style="font:10px var(--f-mono);fill:var(--muted)">${MES[lastM]}</text>`}});
   if(S.ref)s+=`<line x1="${ml}" y1="${y(S.ref)}" x2="${W-mr}" y2="${y(S.ref)}" stroke="var(--ink)" stroke-dasharray="4 3" stroke-width="1.2"/><text x="${W-mr}" y="${y(S.ref)-4}" text-anchor="end" style="font:600 10px var(--f-mono)">${S.ref}</text>`;
+  dots.forEach(p=>{s+=`<circle cx="${(ml+p.fi/(n-1)*(W-ml-mr)).toFixed(1)}" cy="${y(p.val).toFixed(1)}" r="${W<500?1.8:2.3}" fill="${p.col}" fill-opacity="0.35"><title>${p.f} · ${p.d} · ${p.name} ${fmt(p.val)}%</title></circle>`});
   vis.forEach(se=>{if(se.lo){let d='';se.hi.forEach((v,i)=>d+=(i?'L':'M')+x(i)+','+y(v));for(let i=n-1;i>=0;i--)d+='L'+x(i)+','+y(se.lo[i]);s+=`<path d="${d}Z" fill="${se.col}" fill-opacity="0.13" stroke="none"/>`}
     let d='',on=false;se.vals.forEach((v,i)=>{if(v==null){on=false;return}d+=(on?'L':'M')+x(i)+','+y(v);on=true});s+=`<path d="${d}" fill="none" stroke="${se.col}" stroke-width="2.2"/>`;
     const li=se.vals.length-1;if(se.vals[li]!=null)s+=`<circle cx="${x(li)}" cy="${y(se.vals[li])}" r="3.5" fill="${se.col}"/>`});
@@ -416,7 +419,7 @@ function renderEvo(){if(!TS.length){$('evo').innerHTML='';return}const S=evoSeri
   s+=`<rect x="${ml}" y="${mt}" width="${W-ml-mr}" height="${H-mt-mb}" fill="transparent" id="evo-hit"/>`;
   $('evo').innerHTML=s;
   const w=TS[hi_];const d=new Date(w.date+'T12:00');const fd=d.toLocaleDateString('es-ES',{day:'numeric',month:'long'});
-  $('evo-read').innerHTML=`<b>Semana del ${fd}</b> · ${w.n_polls} encuestas · error ${fmt(w.err)} pts (${w.days} días para votar)`;
+  $('evo-read').innerHTML=`<b>Semana del ${fd}</b> · ${w.n_polls} encuestas · error ${fmt(w.err)} pts (${w.days} días para votar)`+(dotKey?'<br>Cada punto es una encuesta; la línea, la media del modelo. En los bloques, si una encuesta no publica SALF o Podemos se completa con la media de esa semana.':'');
   $('evo-leg').innerHTML=S.ser.map(se=>{const v=se.vals[hi_];const lab=v==null?'–':S.fmt(v)+(se.lo?` <span class="muted">(${S.fmt(se.lo[hi_])}–${S.fmt(se.hi[hi_])})</span>`:'');
     return `<span${S.toggle?` data-p="${se.k}" role="button" tabindex="0" style="cursor:pointer;${se.off?'opacity:.4':''}"`:''}><span class="sw" style="background:${se.col};display:inline-block;margin-right:4px"></span>${se.name} <b class="mono">${lab}</b></span>`}).join('')+(S.toggle?'<span class="muted">Pulsa un partido para mostrarlo u ocultarlo.</span>':'');
   if(S.toggle)$('evo-leg').querySelectorAll('[data-p]').forEach(el=>{const f=()=>{const p=el.dataset.p;evo.hidden.has(p)?evo.hidden.delete(p):evo.hidden.add(p);renderEvo()};el.onclick=f;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();f()}}});
